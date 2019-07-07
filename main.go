@@ -38,6 +38,7 @@ type FlowStats struct {
 	SCE                   uint64
 	SCEPercent            float64
 	ESCE                  uint64
+	ESCEPercent           float64
 	ECE                   uint64
 	CWR                   uint64
 	IPBytes               uint64
@@ -100,8 +101,14 @@ func (r *Recorder) NewResult() (e *Result) {
 		if f.Up.SCE > 0 {
 			f.Up.SCEPercent = 100 * float64(f.Up.SCE) / float64(f.Up.DataPackets)
 		}
+		if f.Up.ESCE > 0 {
+			f.Up.ESCEPercent = 100 * float64(f.Up.ESCE) / float64(f.Up.DataPackets)
+		}
 		if f.Down.SCE > 0 {
 			f.Down.SCEPercent = 100 * float64(f.Down.SCE) / float64(f.Down.DataPackets)
+		}
+		if f.Down.ESCE > 0 {
+			f.Down.ESCEPercent = 100 * float64(f.Down.ESCE) / float64(f.Down.DataPackets)
 		}
 		if f.Up.AckedBytes > 0 {
 			f.Up.ESCEAckedBytesPercent = 100 * float64(f.Up.ESCEAckedBytes) / float64(f.Up.AckedBytes)
@@ -119,8 +126,14 @@ func (r *Recorder) NewResult() (e *Result) {
 		if f.Up.SCE > 0 {
 			f.Up.SCEPercent = 100 * float64(f.Up.SCE) / float64(f.Up.DataPackets)
 		}
+		if f.Up.ESCE > 0 {
+			f.Up.ESCEPercent = 100 * float64(f.Up.ESCE) / float64(f.Up.DataPackets)
+		}
 		if f.Down.SCE > 0 {
 			f.Down.SCEPercent = 100 * float64(f.Down.SCE) / float64(f.Down.DataPackets)
+		}
+		if f.Down.ESCE > 0 {
+			f.Down.ESCEPercent = 100 * float64(f.Down.ESCE) / float64(f.Down.DataPackets)
 		}
 		if f.Up.AckedBytes > 0 {
 			f.Up.ESCEAckedBytesPercent = 100 * float64(f.Up.ESCEAckedBytes) / float64(f.Up.AckedBytes)
