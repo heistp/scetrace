@@ -365,7 +365,8 @@ func main() {
 			log.Printf("unable to capture packets on interface %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		log.Printf("listening on %s, link-type %s, snaplen %d", *iface, h.LinkType(), *s)
+		log.Printf("listening on %s, link-type %s, capture size %d, snaplen %d",
+			*iface, h.LinkType(), *b, *s)
 	} else {
 		if h, err = pcap.OpenOffline(*pf); err != nil {
 			log.Printf("unable to open pcap file \"%s\" (%s)", *pf, err)

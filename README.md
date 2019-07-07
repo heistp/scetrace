@@ -26,7 +26,7 @@ Install instructions:
 
 ```
 $ sudo ./scetrace -i enp2s0 tcp port 5201
-listening on enp2s0, link-type Ethernet, snaplen 94
+listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 ^Cinterrupt
 {
     "Flows": [
