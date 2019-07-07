@@ -319,7 +319,7 @@ func main() {
 	log.SetFlags(0)
 
 	flag.Usage = func() {
-		fmt.Printf("usage: %s [-i iface] | [-r file] [ filter expression ]\n", os.Args[0])
+		fmt.Printf("usage: %s [-i iface] | [-r file] [-s snaplen] [-b bufsize] [filter expression]\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 
