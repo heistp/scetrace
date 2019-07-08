@@ -47,6 +47,10 @@ type FlowStats struct {
 	AckedBytes            uint64
 	ESCEAckedBytes        uint64
 	ESCEAckedBytesPercent float64
+	FirstAckTime          time.Time
+	LastAckTime           time.Time
+	ElapsedAckTimeSeconds float64
+	ThroughputMbit        float64
 	AckSeen               bool   `json:"-"`
 	PriorAck              uint32 `json:"-"`
 }
@@ -98,6 +102,8 @@ func (r *Recorder) NewResult() (e *Result) {
 		e.TotalIPBytes += f.Up.IPBytes
 		e.DownIPBytes += f.Down.IPBytes
 		e.TotalIPBytes += f.Down.IPBytes
+		f.Up.ElapsedAckTimeSeconds = f.Up.LastAckTime.Sub(f.Up.FirstAckTime).Seconds()
+		f.Down.ElapsedAckTimeSeconds = f.Down.LastAckTime.Sub(f.Down.FirstAckTime).Seconds()
 		if f.Up.SCE > 0 {
 			f.Up.SCEPercent = 100 * float64(f.Up.SCE) / float64(f.Up.DataPackets)
 		}
@@ -112,9 +118,15 @@ func (r *Recorder) NewResult() (e *Result) {
 		}
 		if f.Up.AckedBytes > 0 {
 			f.Up.ESCEAckedBytesPercent = 100 * float64(f.Up.ESCEAckedBytes) / float64(f.Up.AckedBytes)
+			if f.Up.ElapsedAckTimeSeconds > 0 {
+				f.Down.ThroughputMbit = float64(f.Up.AckedBytes) * 8 / 1000000 / f.Up.ElapsedAckTimeSeconds
+			}
 		}
 		if f.Down.AckedBytes > 0 {
 			f.Down.ESCEAckedBytesPercent = 100 * float64(f.Down.ESCEAckedBytes) / float64(f.Down.AckedBytes)
+			if f.Down.ElapsedAckTimeSeconds > 0 {
+				f.Up.ThroughputMbit = float64(f.Down.AckedBytes) * 8 / 1000000 / f.Down.ElapsedAckTimeSeconds
+			}
 		}
 	}
 	for _, f := range r.IP6Flows {
@@ -123,6 +135,8 @@ func (r *Recorder) NewResult() (e *Result) {
 		e.TotalIPBytes += f.Up.IPBytes
 		e.DownIPBytes += f.Down.IPBytes
 		e.TotalIPBytes += f.Down.IPBytes
+		f.Up.ElapsedAckTimeSeconds = f.Up.LastAckTime.Sub(f.Up.FirstAckTime).Seconds()
+		f.Down.ElapsedAckTimeSeconds = f.Down.LastAckTime.Sub(f.Down.FirstAckTime).Seconds()
 		if f.Up.SCE > 0 {
 			f.Up.SCEPercent = 100 * float64(f.Up.SCE) / float64(f.Up.DataPackets)
 		}
@@ -137,9 +151,15 @@ func (r *Recorder) NewResult() (e *Result) {
 		}
 		if f.Up.AckedBytes > 0 {
 			f.Up.ESCEAckedBytesPercent = 100 * float64(f.Up.ESCEAckedBytes) / float64(f.Up.AckedBytes)
+			if f.Up.ElapsedAckTimeSeconds > 0 {
+				f.Down.ThroughputMbit = float64(f.Up.AckedBytes) * 8 / 1000000 / f.Up.ElapsedAckTimeSeconds
+			}
 		}
 		if f.Down.AckedBytes > 0 {
 			f.Down.ESCEAckedBytesPercent = 100 * float64(f.Down.ESCEAckedBytes) / float64(f.Down.AckedBytes)
+			if f.Down.ElapsedAckTimeSeconds > 0 {
+				f.Up.ThroughputMbit = float64(f.Down.AckedBytes) * 8 / 1000000 / f.Down.ElapsedAckTimeSeconds
+			}
 		}
 	}
 	sort.Slice(e.Flows, func(i, j int) bool { return e.Flows[i].Index < e.Flows[j].Index })
@@ -174,7 +194,8 @@ func parse(h *pcap.Handle, r *Recorder) {
 	var dscp uint8
 
 	psrc := gopacket.NewPacketSource(h, h.LinkType())
-	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &ip6, &tcp)
+	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet,
+		&eth, &ip4, &ip6, &tcp)
 	parser.DecodingLayerParserOptions.IgnoreUnsupported = true
 	dec := []gopacket.LayerType{}
 	for {
@@ -265,8 +286,13 @@ func parse(h *pcap.Handle, r *Recorder) {
 				if fs.AckSeen {
 					ackedBytes = uint64(tcp.Ack - fs.PriorAck)
 					fs.AckedBytes += ackedBytes
+					if !tcp.FIN {
+						fs.LastAckTime = p.Metadata().Timestamp
+					}
 				} else {
 					fs.AckSeen = true
+					fs.FirstAckTime = p.Metadata().Timestamp
+					fs.LastAckTime = fs.FirstAckTime
 				}
 				fs.PriorAck = tcp.Ack
 			}
