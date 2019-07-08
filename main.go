@@ -314,7 +314,7 @@ func record(h *pcap.Handle, r *Recorder) {
 				if fs.AckSeen {
 					ackedBytes = uint64(tcp.Ack - fs.PriorAck)
 					fs.AckedBytes += ackedBytes
-					if !tcp.FIN {
+					if !tcp.FIN && ackedBytes > 0 {
 						fs.LastAckTime = tstamp
 					}
 				} else {
@@ -401,7 +401,7 @@ func printResult(r *Result) {
 	fmt.Println(string(json))
 
 	if r.PCAPStats != nil {
-		log.Printf("%d packets captured", r.PacketsCaptured)
+		log.Printf("%d packets captured from %d flows", r.PacketsCaptured, len(r.Flows))
 		log.Printf("%d packets received by filter", r.PCAPStats.PacketsReceived)
 		log.Printf("%d packets dropped by kernel", r.PCAPStats.PacketsDropped)
 		log.Printf("%d packets dropped by interface", r.PCAPStats.PacketsIfDropped)
@@ -442,10 +442,10 @@ func main() {
 			log.Printf("unable to create handle for interface %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		/*if err = ih.SetImmediateMode(true); err != nil {
+		if err = ih.SetImmediateMode(true); err != nil {
 			log.Printf("unable to set immediate mode for %s (%s)", *iface, err)
 			os.Exit(1)
-		}*/
+		}
 		if err = ih.SetBufferSize(*b); err != nil {
 			log.Printf("unable to set timeout for %s (%s)", *iface, err)
 			os.Exit(1)
@@ -502,7 +502,8 @@ func main() {
 	result := recorder.NewResult()
 	printResult(result)
 	mbit := float64(result.TotalIPBytes) * 8 / 1024 / 1024 / elapsed.Seconds()
+	pps := float64(result.PacketsCaptured) / elapsed.Seconds()
 	if *pf != "" {
-		log.Printf("parsed in %.3fs (%.2fMbit)", elapsed.Seconds(), mbit)
+		log.Printf("parsed in %.3fs (%.0f pps, %.2fMbit)", elapsed.Seconds(), mbit, pps)
 	}
 }
