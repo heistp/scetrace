@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -33,7 +34,7 @@ const (
 	CE     ECN = 0x03
 )
 
-type FlowStats struct {
+type Stats struct {
 	CE                    uint64
 	SCE                   uint64
 	SCEPercent            float64
@@ -50,9 +51,24 @@ type FlowStats struct {
 	FirstAckTime          time.Time
 	LastAckTime           time.Time
 	ElapsedAckTimeSeconds float64
+	MeanSeqRTTMillis      float64
+	MeanTSValRTTMillis    float64
 	ThroughputMbit        float64
-	AckSeen               bool   `json:"-"`
-	PriorAck              uint32 `json:"-"`
+	TSValTimes            map[uint32]time.Time `json:"-"`
+	TotalTSValRTT         time.Duration        `json:"-"`
+	TSValRTTCount         uint64               `json:"-"`
+	SeqTimes              map[uint32]time.Time `json:"-"`
+	TotalSeqRTT           time.Duration        `json:"-"`
+	SeqRTTCount           uint64               `json:"-"`
+	AckSeen               bool                 `json:"-"`
+	PriorAck              uint32               `json:"-"`
+}
+
+func NewStats() *Stats {
+	return &Stats{
+		TSValTimes: make(map[uint32]time.Time),
+		SeqTimes:   make(map[uint32]time.Time),
+	}
 }
 
 type IP4FlowKey struct {
@@ -96,41 +112,16 @@ func (r *Recorder) NewResult() (e *Result) {
 		PacketsCaptured: r.PacketsCaptured,
 	}
 	e.PCAPStats, _ = r.Handle.Stats()
+
 	for _, f := range r.IP4Flows {
 		e.Flows = append(e.Flows, f)
-		e.UpIPBytes += f.Up.IPBytes
-		e.TotalIPBytes += f.Up.IPBytes
-		e.DownIPBytes += f.Down.IPBytes
-		e.TotalIPBytes += f.Down.IPBytes
-		f.Up.ElapsedAckTimeSeconds = f.Up.LastAckTime.Sub(f.Up.FirstAckTime).Seconds()
-		f.Down.ElapsedAckTimeSeconds = f.Down.LastAckTime.Sub(f.Down.FirstAckTime).Seconds()
-		if f.Up.SCE > 0 {
-			f.Up.SCEPercent = 100 * float64(f.Up.SCE) / float64(f.Up.DataPackets)
-		}
-		if f.Up.ESCE > 0 {
-			f.Up.ESCEPercent = 100 * float64(f.Up.ESCE) / float64(f.Up.DataPackets)
-		}
-		if f.Down.SCE > 0 {
-			f.Down.SCEPercent = 100 * float64(f.Down.SCE) / float64(f.Down.DataPackets)
-		}
-		if f.Down.ESCE > 0 {
-			f.Down.ESCEPercent = 100 * float64(f.Down.ESCE) / float64(f.Down.DataPackets)
-		}
-		if f.Up.AckedBytes > 0 {
-			f.Up.ESCEAckedBytesPercent = 100 * float64(f.Up.ESCEAckedBytes) / float64(f.Up.AckedBytes)
-			if f.Up.ElapsedAckTimeSeconds > 0 {
-				f.Down.ThroughputMbit = float64(f.Up.AckedBytes) * 8 / 1000000 / f.Up.ElapsedAckTimeSeconds
-			}
-		}
-		if f.Down.AckedBytes > 0 {
-			f.Down.ESCEAckedBytesPercent = 100 * float64(f.Down.ESCEAckedBytes) / float64(f.Down.AckedBytes)
-			if f.Down.ElapsedAckTimeSeconds > 0 {
-				f.Up.ThroughputMbit = float64(f.Down.AckedBytes) * 8 / 1000000 / f.Down.ElapsedAckTimeSeconds
-			}
-		}
 	}
 	for _, f := range r.IP6Flows {
 		e.Flows = append(e.Flows, f)
+	}
+	sort.Slice(e.Flows, func(i, j int) bool { return e.Flows[i].Index < e.Flows[j].Index })
+
+	for _, f := range e.Flows {
 		e.UpIPBytes += f.Up.IPBytes
 		e.TotalIPBytes += f.Up.IPBytes
 		e.DownIPBytes += f.Down.IPBytes
@@ -161,8 +152,23 @@ func (r *Recorder) NewResult() (e *Result) {
 				f.Up.ThroughputMbit = float64(f.Down.AckedBytes) * 8 / 1000000 / f.Down.ElapsedAckTimeSeconds
 			}
 		}
+		if f.Up.SeqRTTCount > 0 {
+			f.Up.MeanSeqRTTMillis = float64(f.Up.TotalSeqRTT.Nanoseconds()) / 1000000 / float64(f.Up.SeqRTTCount)
+		}
+		if f.Down.SeqRTTCount > 0 {
+			f.Down.MeanSeqRTTMillis = float64(f.Down.TotalSeqRTT.Nanoseconds()) / 1000000 / float64(f.Down.SeqRTTCount)
+		}
+		if f.Up.TSValRTTCount > 0 {
+			f.Up.MeanTSValRTTMillis = float64(f.Up.TotalTSValRTT.Nanoseconds()) / 1000000 / float64(f.Up.TSValRTTCount)
+		}
+		if f.Down.TSValRTTCount > 0 {
+			f.Down.MeanTSValRTTMillis = float64(f.Down.TotalTSValRTT.Nanoseconds()) / 1000000 / float64(f.Down.TSValRTTCount)
+		}
+
+		f.MeanSeqRTTMillis = f.Up.MeanSeqRTTMillis + f.Down.MeanSeqRTTMillis
+		f.MeanTSValRTTMillis = f.Up.MeanTSValRTTMillis + f.Down.MeanTSValRTTMillis
 	}
-	sort.Slice(e.Flows, func(i, j int) bool { return e.Flows[i].Index < e.Flows[j].Index })
+
 	return
 }
 
@@ -176,21 +182,25 @@ type Result struct {
 }
 
 type Flow struct {
-	Index   int `json:"-"`
-	SrcIP   net.IP
-	SrcPort layers.TCPPort
-	DstIP   net.IP
-	DstPort layers.TCPPort
-	Up      FlowStats
-	Down    FlowStats
+	Index              int `json:"-"`
+	SrcIP              net.IP
+	SrcPort            layers.TCPPort
+	DstIP              net.IP
+	DstPort            layers.TCPPort
+	Up                 *Stats
+	Down               *Stats
+	MeanSeqRTTMillis   float64
+	MeanTSValRTTMillis float64
 }
 
-func parse(h *pcap.Handle, r *Recorder) {
+func record(h *pcap.Handle, r *Recorder) {
 	var eth layers.Ethernet
 	var ip4 layers.IPv4
 	var ip6 layers.IPv6
 	var tcp layers.TCP
-	var fs *FlowStats
+	var tsval, tsecr uint32
+	var fs *Stats
+	var fsr *Stats
 	var dscp uint8
 
 	psrc := gopacket.NewPacketSource(h, h.LinkType())
@@ -245,6 +255,8 @@ func parse(h *pcap.Handle, r *Recorder) {
 							DstIP:   ip4.DstIP,
 							SrcPort: tcp.SrcPort,
 							DstPort: tcp.DstPort,
+							Up:      NewStats(),
+							Down:    NewStats(),
 						}
 						r.IP4Flows[k] = f
 						r.FlowIndex++
@@ -266,6 +278,8 @@ func parse(h *pcap.Handle, r *Recorder) {
 							DstIP:   ip6.DstIP,
 							SrcPort: tcp.SrcPort,
 							DstPort: tcp.DstPort,
+							Up:      NewStats(),
+							Down:    NewStats(),
 						}
 						r.IP6Flows[k] = f
 						r.FlowIndex++
@@ -276,25 +290,65 @@ func parse(h *pcap.Handle, r *Recorder) {
 			}
 
 			if up {
-				fs = &f.Up
+				fs = f.Up
+				fsr = f.Down
 			} else {
-				fs = &f.Down
+				fs = f.Down
+				fsr = f.Up
 			}
 
 			ackedBytes := uint64(0)
+			tstamp := p.Metadata().Timestamp
+
+			tsok := false
+			for _, opt := range tcp.Options {
+				if opt.OptionType == layers.TCPOptionKindTimestamps &&
+					opt.OptionLength == 10 {
+					tsval = binary.BigEndian.Uint32(opt.OptionData[:4])
+					tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
+					tsok = true
+				}
+			}
+
 			if tcp.ACK {
 				if fs.AckSeen {
 					ackedBytes = uint64(tcp.Ack - fs.PriorAck)
 					fs.AckedBytes += ackedBytes
 					if !tcp.FIN {
-						fs.LastAckTime = p.Metadata().Timestamp
+						fs.LastAckTime = tstamp
 					}
 				} else {
 					fs.AckSeen = true
-					fs.FirstAckTime = p.Metadata().Timestamp
+					fs.FirstAckTime = tstamp
 					fs.LastAckTime = fs.FirstAckTime
 				}
 				fs.PriorAck = tcp.Ack
+
+				if ackedBytes > 0 {
+					pack := tcp.Ack - uint32(ackedBytes)
+					if pt, ok := fsr.SeqTimes[pack]; ok {
+						fsr.TotalSeqRTT += tstamp.Sub(pt)
+						fsr.SeqRTTCount++
+						delete(fsr.SeqTimes, pack)
+					}
+				}
+
+				if tsok {
+					if pt, ok := fsr.TSValTimes[tsecr]; ok {
+						fsr.TotalTSValRTT += tstamp.Sub(pt)
+						fsr.TSValRTTCount++
+						delete(fsr.TSValTimes, tsecr)
+					}
+				}
+			}
+
+			segmentLen := int(ip4.Length) - 4*int(ip4.IHL) - 4*int(tcp.DataOffset)
+			if segmentLen > 0 {
+				fs.SeqTimes[tcp.Seq] = tstamp
+			}
+
+			if tsok {
+				fs.TSValTimes[tsval] = tstamp
 			}
 
 			if !tcp.SYN && !tcp.FIN && !tcp.RST {
@@ -443,7 +497,7 @@ func main() {
 		IP4Flows: make(map[IP4FlowKey]*Flow),
 		IP6Flows: make(map[IP6FlowKey]*Flow),
 	}
-	parse(h, recorder)
+	record(h, recorder)
 	elapsed := time.Since(start)
 	result := recorder.NewResult()
 	printResult(result)

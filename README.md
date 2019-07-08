@@ -7,9 +7,11 @@ Feel free to report any problems or feature requests as issues.
 ## Features
 
 - reads from pcap file or live capture, with filter expression support
-- records per-flow counts for: CE, SCE, ESCE, ECE, CWR, packets, acked bytes
-- calculates SCE percent and ESCE acked bytes percent for feedback verification
-- calculates TCP throughput from pcap timestamps and acked bytes
+- records or calculates:
+  - per-flow counts for: CE, SCE, ESCE, ECE, CWR, packets, acked bytes
+  - SCE percent and ESCE acked bytes percent for feedback verification
+  - TCP throughput from pcap timestamps and acked bytes
+  - TCP RTT using both TCP timestamp and TCP seqno methods
 - outputs JSON
 - uses gopacket DecodingLayerParser for high performance
 
@@ -33,7 +35,7 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
     "Flows": [
         {
             "SrcIP": "10.9.1.2",
-            "SrcPort": 33452,
+            "SrcPort": 33480,
             "DstIP": "10.9.2.2",
             "DstPort": 5201,
             "Up": {
@@ -47,13 +49,15 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
                 "IPBytes": 1409,
                 "DataPackets": 16,
                 "Packets": 18,
-                "AckedBytes": 312,
+                "AckedBytes": 318,
                 "ESCEAckedBytes": 0,
                 "ESCEAckedBytesPercent": 0,
-                "FirstAckTime": "2019-07-08T10:08:53.023296585+02:00",
-                "LastAckTime": "2019-07-08T10:09:08.037778373+02:00",
-                "ElapsedAckTimeSeconds": 15.014481788,
-                "ThroughputMbit": 0.00024828536636811906
+                "FirstAckTime": "2019-07-08T13:29:21.556556501+02:00",
+                "LastAckTime": "2019-07-08T13:29:36.571774422+02:00",
+                "ElapsedAckTimeSeconds": 15.015217921,
+                "MeanSeqRTTMillis": 0.027662714285714287,
+                "MeanTSValRTTMillis": 0.3812953333333333,
+                "ThroughputMbit": 0.00024829173881724554
             },
             "Down": {
                 "CE": 0,
@@ -63,75 +67,85 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
                 "ESCEPercent": 0,
                 "ECE": 0,
                 "CWR": 0,
-                "IPBytes": 1203,
-                "DataPackets": 15,
-                "Packets": 17,
+                "IPBytes": 1157,
+                "DataPackets": 14,
+                "Packets": 16,
                 "AckedBytes": 466,
                 "ESCEAckedBytes": 0,
                 "ESCEAckedBytesPercent": 0,
-                "FirstAckTime": "2019-07-08T10:08:53.022457328+02:00",
-                "LastAckTime": "2019-07-08T10:09:08.037438092+02:00",
-                "ElapsedAckTimeSeconds": 15.014980764,
-                "ThroughputMbit": 0.00016623950365006097
-            }
+                "FirstAckTime": "2019-07-08T13:29:21.555895272+02:00",
+                "LastAckTime": "2019-07-08T13:29:36.570490674+02:00",
+                "ElapsedAckTimeSeconds": 15.014595402,
+                "MeanSeqRTTMillis": 0.7714740000000001,
+                "MeanTSValRTTMillis": 0.8178597272727273,
+                "ThroughputMbit": 0.00016942811042668982
+            },
+            "MeanSeqRTTMillis": 0.7991367142857144,
+            "MeanTSValRTTMillis": 1.1991550606060606
         },
         {
             "SrcIP": "10.9.1.2",
-            "SrcPort": 33454,
+            "SrcPort": 33482,
             "DstIP": "10.9.2.2",
             "DstPort": 5201,
             "Up": {
                 "CE": 1,
-                "SCE": 5112,
-                "SCEPercent": 41.31576820496242,
+                "SCE": 5162,
+                "SCEPercent": 41.76037537416067,
                 "ESCE": 0,
                 "ESCEPercent": 0,
                 "ECE": 0,
                 "CWR": 1,
-                "IPBytes": 18556701,
-                "DataPackets": 12373,
-                "Packets": 12374,
-                "AckedBytes": 0,
+                "IPBytes": 18538701,
+                "DataPackets": 12361,
+                "Packets": 12362,
+                "AckedBytes": 1,
                 "ESCEAckedBytes": 0,
                 "ESCEAckedBytesPercent": 0,
-                "FirstAckTime": "2019-07-08T10:08:53.026284539+02:00",
-                "LastAckTime": "2019-07-08T10:09:08.033760902+02:00",
-                "ElapsedAckTimeSeconds": 15.007476363,
-                "ThroughputMbit": 9.548715063369542
+                "FirstAckTime": "2019-07-08T13:29:21.558998343+02:00",
+                "LastAckTime": "2019-07-08T13:29:36.573101727+02:00",
+                "ElapsedAckTimeSeconds": 15.014103384,
+                "MeanSeqRTTMillis": 0.8748402566341574,
+                "MeanTSValRTTMillis": 0.45539316329503154,
+                "ThroughputMbit": 9.535644213804419
             },
             "Down": {
                 "CE": 0,
                 "SCE": 0,
                 "SCEPercent": 0,
-                "ESCE": 5112,
-                "ESCEPercent": 58.37615621788284,
-                "ECE": 13,
+                "ESCE": 5155,
+                "ESCEPercent": 58.45996824676797,
+                "ECE": 12,
                 "CWR": 0,
-                "IPBytes": 455556,
-                "DataPackets": 8757,
-                "Packets": 8761,
-                "AckedBytes": 17910349,
-                "ESCEAckedBytes": 8538856,
-                "ESCEAckedBytesPercent": 47.67554222421908,
-                "FirstAckTime": "2019-07-08T10:08:53.025671499+02:00",
-                "LastAckTime": "2019-07-08T10:09:08.031124175+02:00",
-                "ElapsedAckTimeSeconds": 15.005452676,
-                "ThroughputMbit": 0
-            }
+                "IPBytes": 458928,
+                "DataPackets": 8818,
+                "Packets": 8827,
+                "AckedBytes": 17885733,
+                "ESCEAckedBytes": 8469352,
+                "ESCEAckedBytesPercent": 47.35255748254768,
+                "FirstAckTime": "2019-07-08T13:29:21.558512867+02:00",
+                "LastAckTime": "2019-07-08T13:29:36.563882278+02:00",
+                "ElapsedAckTimeSeconds": 15.005369411,
+                "MeanSeqRTTMillis": 0,
+                "MeanTSValRTTMillis": 3.4395199842598125,
+                "ThroughputMbit": 5.328323507166813e-7
+            },
+            "MeanSeqRTTMillis": 0.8748402566341574,
+            "MeanTSValRTTMillis": 3.894913147554844
         }
     ],
-    "PacketsCaptured": 21170,
-    "UpIPBytes": 18558110,
-    "DownIPBytes": 456759,
-    "TotalIPBytes": 19014869,
+    "PacketsCaptured": 21223,
+    "UpIPBytes": 18540110,
+    "DownIPBytes": 460085,
+    "TotalIPBytes": 19000195,
     "PCAPStats": {
-        "PacketsReceived": 21170,
+        "PacketsReceived": 21223,
         "PacketsDropped": 0,
         "PacketsIfDropped": 0
     }
 }
-21170 packets captured
-21170 packets received by filter
+21223 packets captured
+21223 packets received by filter
 0 packets dropped by kernel
 0 packets dropped by interface
 ```
