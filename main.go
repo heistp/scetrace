@@ -504,6 +504,6 @@ func main() {
 	mbit := float64(result.TotalIPBytes) * 8 / 1024 / 1024 / elapsed.Seconds()
 	pps := float64(result.PacketsCaptured) / elapsed.Seconds()
 	if *pf != "" {
-		log.Printf("parsed in %.3fs (%.0f pps, %.2fMbit)", elapsed.Seconds(), mbit, pps)
+		log.Printf("parsed in %.3fs (%.0f pps, %.2fMbit)", elapsed.Seconds(), pps, mbit)
 	}
 }
