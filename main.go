@@ -99,6 +99,8 @@ type Recorder struct {
 	IP6Flows        map[IP6FlowKey]*Flow
 	FlowIndex       int
 	PacketsCaptured uint64
+	FirstPacketTime time.Time
+	LastPacketTime  time.Time
 	sync.Mutex
 }
 
@@ -110,6 +112,10 @@ func (r *Recorder) NewResult() (e *Result) {
 	e = &Result{
 		Flows:           make([]*Flow, 0, len(r.IP4Flows)+len(r.IP6Flows)),
 		PacketsCaptured: r.PacketsCaptured,
+	}
+	elapsed := r.LastPacketTime.Sub(r.FirstPacketTime).Seconds()
+	if elapsed > 0 {
+		e.PacketsPerSecond = float64(r.PacketsCaptured) / elapsed
 	}
 	e.PCAPStats, _ = r.Handle.Stats()
 
@@ -173,12 +179,13 @@ func (r *Recorder) NewResult() (e *Result) {
 }
 
 type Result struct {
-	Flows           []*Flow
-	PacketsCaptured uint64
-	UpIPBytes       uint64
-	DownIPBytes     uint64
-	TotalIPBytes    uint64
-	PCAPStats       *pcap.Stats `json:",omitempty"`
+	Flows            []*Flow
+	PacketsCaptured  uint64
+	PacketsPerSecond float64
+	UpIPBytes        uint64
+	DownIPBytes      uint64
+	TotalIPBytes     uint64
+	PCAPStats        *pcap.Stats `json:",omitempty"`
 }
 
 type Flow struct {
@@ -235,6 +242,12 @@ func record(h *pcap.Handle, r *Recorder) {
 			log.Printf("decode error: %s", err)
 			continue
 		}
+
+		now := time.Now()
+		if r.FirstPacketTime.IsZero() {
+			r.FirstPacketTime = now
+		}
+		r.LastPacketTime = now
 
 		isTCP := false
 		isIP4 := true
@@ -406,7 +419,8 @@ func printResult(r *Result) {
 	fmt.Println(string(json))
 
 	if r.PCAPStats != nil {
-		log.Printf("%d packets captured from %d flows", r.PacketsCaptured, len(r.Flows))
+		log.Printf("%d packets captured from %d flows at %.0f pps",
+			r.PacketsCaptured, len(r.Flows), r.PacketsPerSecond)
 		log.Printf("%d packets received by filter", r.PCAPStats.PacketsReceived)
 		log.Printf("%d packets dropped by kernel", r.PCAPStats.PacketsDropped)
 		log.Printf("%d packets dropped by interface", r.PCAPStats.PacketsIfDropped)
@@ -512,8 +526,7 @@ func main() {
 	result := recorder.NewResult()
 	printResult(result)
 	mbit := float64(result.TotalIPBytes) * 8 / 1024 / 1024 / elapsed.Seconds()
-	pps := float64(result.PacketsCaptured) / elapsed.Seconds()
 	if *pf != "" {
-		log.Printf("parsed in %.3fs (%.0f pps, %.2fMbit)", elapsed.Seconds(), pps, mbit)
+		log.Printf("parsed in %.3fs (%.0f pps, %.2fMbit)", elapsed.Seconds(), result.PacketsPerSecond, mbit)
 	}
 }
