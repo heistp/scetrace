@@ -73,6 +73,8 @@ type OneWayStats struct {
 	FirstAckTime          time.Time
 	LastAckTime           time.Time
 	ElapsedAckTimeSeconds float64
+	MeanPacketSizeBytes   float64
+	MeanSegmentSizeBytes  float64
 	MeanSeqRTTMillis      float64
 	MeanTSValRTTMillis    float64
 	ThroughputMbit        float64
@@ -372,6 +374,12 @@ func (r *Recorder) NewResult() (e *Result) {
 		}
 		if s.TSValRTTCount > 0 {
 			s.MeanTSValRTTMillis = float64(s.TotalTSValRTT.Nanoseconds()) / 1000000 / float64(s.TSValRTTCount)
+		}
+		if s.Packets > 0 {
+			s.MeanPacketSizeBytes = float64(s.IPBytes) / float64(s.Packets)
+		}
+		if s.DataPackets > 0 {
+			s.MeanSegmentSizeBytes = float64(rs.AckedBytes) / float64(s.DataPackets)
 		}
 	}
 

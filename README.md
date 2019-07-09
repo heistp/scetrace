@@ -152,7 +152,6 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 
 ## Todo
 
-- Implement reading without DecodingLayerParser for non-Ethernet links
+- Split IP and TCP stats
 - Distinguish clearly between captured and real timescale stats, mainly for
   packets per second and throughput
-- Add average packet length
