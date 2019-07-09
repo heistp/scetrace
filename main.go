@@ -202,53 +202,46 @@ func record(h *pcap.Handle, r *Recorder) {
 	var fs *Stats
 	var fsr *Stats
 	var dscp uint8
+	var ok, rok, up bool
+	var f *Flow
+	k4 := IP4FlowKey{}
+	k6 := IP6FlowKey{}
 
-	psrc := gopacket.NewPacketSource(h, h.LinkType())
+	// read packets and write to channel
+	pch := make(chan gopacket.Packet, 1000)
+	go func() {
+		psrc := gopacket.NewPacketSource(h, h.LinkType())
+		defer close(pch)
+		for {
+			p, err := psrc.NextPacket()
+			if err == nil {
+				pch <- p
+			} else if err == io.EOF || err == syscall.EBADF {
+				break
+			} else {
+				log.Println(err)
+			}
+		}
+	}()
+
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet,
 		&eth, &ip4, &ip6, &tcp)
 	parser.DecodingLayerParserOptions.IgnoreUnsupported = true
 	dec := []gopacket.LayerType{}
 
-	/*
-		pch := make(chan gopacket.Packet, 1000)
-		go func() {
-			defer close(pch)
-			for {
-				p, err := psrc.NextPacket()
-				if err == io.EOF || err == syscall.EBADF {
-					break
-				} else if err != nil {
-					log.Println(err)
-				} else {
-					pch <- p
-				}
-			}
-		}()
-	*/
-
-	//for p := range pch {
-	for {
-		p, err := psrc.NextPacket()
-		if err == io.EOF || err == syscall.EBADF {
-			break
-		} else if err != nil {
-			log.Println(err)
-			continue
-		}
-
+	// read and process packets from channel
+	for p := range pch {
 		if err := parser.DecodeLayers(p.Data(), &dec); err != nil {
 			log.Printf("decode error: %s", err)
 			continue
 		}
 
 		isTCP := false
-		isIP4 := false
+		isIP4 := true
 		for _, lt := range dec {
 			switch lt {
 			case layers.LayerTypeTCP:
 				isTCP = true
-			case layers.LayerTypeIPv4:
-				isIP4 = true
 			case layers.LayerTypeIPv6:
 				isIP4 = false
 			}
@@ -256,18 +249,15 @@ func record(h *pcap.Handle, r *Recorder) {
 		r.Lock()
 		r.PacketsCaptured++
 		if isTCP {
-			up := true
-			var f *Flow
-			var ok, rok bool
+			up = true
 
 			if isIP4 {
-				k := IP4FlowKey{}
-				copy(k.SrcIP[:], ip4.SrcIP)
-				k.SrcPort = tcp.SrcPort
-				copy(k.DstIP[:], ip4.DstIP)
-				k.DstPort = tcp.DstPort
-				if f, ok = r.IP4Flows[k]; !ok {
-					if f, rok = r.IP4Flows[k.Reverse()]; !rok {
+				copy(k4.SrcIP[:], ip4.SrcIP)
+				k4.SrcPort = tcp.SrcPort
+				copy(k4.DstIP[:], ip4.DstIP)
+				k4.DstPort = tcp.DstPort
+				if f, ok = r.IP4Flows[k4]; !ok {
+					if f, rok = r.IP4Flows[k4.Reverse()]; !rok {
 						f = &Flow{
 							Index:   r.FlowIndex,
 							SrcIP:   ip4.SrcIP,
@@ -277,20 +267,19 @@ func record(h *pcap.Handle, r *Recorder) {
 							Up:      NewStats(),
 							Down:    NewStats(),
 						}
-						r.IP4Flows[k] = f
+						r.IP4Flows[k4] = f
 						r.FlowIndex++
 					} else {
 						up = false
 					}
 				}
 			} else {
-				k := IP6FlowKey{}
-				copy(k.SrcIP[:], ip6.SrcIP)
-				k.SrcPort = tcp.SrcPort
-				copy(k.DstIP[:], ip6.DstIP)
-				k.DstPort = tcp.DstPort
-				if f, ok = r.IP6Flows[k]; !ok {
-					if f, rok = r.IP6Flows[k.Reverse()]; !rok {
+				copy(k6.SrcIP[:], ip6.SrcIP)
+				k6.SrcPort = tcp.SrcPort
+				copy(k6.DstIP[:], ip6.DstIP)
+				k6.DstPort = tcp.DstPort
+				if f, ok = r.IP6Flows[k6]; !ok {
+					if f, rok = r.IP6Flows[k6.Reverse()]; !rok {
 						f = &Flow{
 							Index:   r.FlowIndex,
 							SrcIP:   ip6.SrcIP,
@@ -300,8 +289,10 @@ func record(h *pcap.Handle, r *Recorder) {
 							Up:      NewStats(),
 							Down:    NewStats(),
 						}
-						r.IP6Flows[k] = f
+						r.IP6Flows[k6] = f
 						r.FlowIndex++
+						fs = f.Up
+						fsr = f.Down
 					} else {
 						up = false
 					}
@@ -316,30 +307,31 @@ func record(h *pcap.Handle, r *Recorder) {
 				fsr = f.Up
 			}
 
-			ackedBytes := uint64(0)
 			tstamp := p.Metadata().Timestamp
-
 			tsok := false
 			for _, opt := range tcp.Options {
 				if opt.OptionType == layers.TCPOptionKindTimestamps &&
 					opt.OptionLength == 10 {
 					tsval = binary.BigEndian.Uint32(opt.OptionData[:4])
 					tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
+					fs.TSValTimes[tsval] = tstamp
 					tsok = true
+					break
 				}
 			}
 
+			ackedBytes := uint64(0)
 			if tcp.ACK {
 				if fs.AckSeen {
 					ackedBytes = uint64(tcp.Ack - fs.PriorAck)
 					fs.AckedBytes += ackedBytes
-					if !tcp.FIN && ackedBytes > 0 {
+					if ackedBytes > 0 {
 						fs.LastAckTime = tstamp
 					}
 				} else {
 					fs.AckSeen = true
 					fs.FirstAckTime = tstamp
-					fs.LastAckTime = fs.FirstAckTime
+					fs.LastAckTime = tstamp
 				}
 				fs.PriorAck = tcp.Ack
 
@@ -361,13 +353,18 @@ func record(h *pcap.Handle, r *Recorder) {
 				}
 			}
 
-			segmentLen := int(ip4.Length) - 4*int(ip4.IHL) - 4*int(tcp.DataOffset)
-			if segmentLen > 0 {
-				fs.SeqTimes[tcp.Seq] = tstamp
-			}
-
-			if tsok {
-				fs.TSValTimes[tsval] = tstamp
+			if isIP4 {
+				if int(ip4.Length)-4*int(ip4.IHL)-4*int(tcp.DataOffset) > 0 {
+					fs.SeqTimes[tcp.Seq] = tstamp
+				}
+				fs.IPBytes += uint64(ip4.Length)
+				dscp = ip4.TOS
+			} else {
+				if ip6.Length > 0 {
+					fs.SeqTimes[tcp.Seq] = tstamp
+				}
+				fs.IPBytes += uint64(ip6.Length)
+				dscp = ip6.TrafficClass
 			}
 
 			if !tcp.SYN && !tcp.FIN && !tcp.RST {
@@ -382,11 +379,6 @@ func record(h *pcap.Handle, r *Recorder) {
 					fs.ESCE++
 					fs.ESCEAckedBytes += ackedBytes
 				}
-				if isIP4 {
-					dscp = ip4.TOS
-				} else {
-					dscp = ip6.TrafficClass
-				}
 				switch ECN(dscp & 0x03) {
 				case NotECT:
 				case SCE:
@@ -398,12 +390,6 @@ func record(h *pcap.Handle, r *Recorder) {
 			}
 
 			fs.Packets++
-
-			if isIP4 {
-				fs.IPBytes += uint64(ip4.Length)
-			} else {
-				fs.IPBytes += uint64(ip6.Length)
-			}
 		}
 		r.Unlock()
 	}
