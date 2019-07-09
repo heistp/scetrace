@@ -208,9 +208,28 @@ func record(h *pcap.Handle, r *Recorder) {
 		&eth, &ip4, &ip6, &tcp)
 	parser.DecodingLayerParserOptions.IgnoreUnsupported = true
 	dec := []gopacket.LayerType{}
+
+	/*
+		pch := make(chan gopacket.Packet, 1000)
+		go func() {
+			defer close(pch)
+			for {
+				p, err := psrc.NextPacket()
+				if err == io.EOF || err == syscall.EBADF {
+					break
+				} else if err != nil {
+					log.Println(err)
+				} else {
+					pch <- p
+				}
+			}
+		}()
+	*/
+
+	//for p := range pch {
 	for {
 		p, err := psrc.NextPacket()
-		if err == io.EOF {
+		if err == io.EOF || err == syscall.EBADF {
 			break
 		} else if err != nil {
 			log.Println(err)
@@ -442,12 +461,16 @@ func main() {
 			log.Printf("unable to create handle for interface %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		if err = ih.SetImmediateMode(true); err != nil {
+		/*if err = ih.SetImmediateMode(true); err != nil {
 			log.Printf("unable to set immediate mode for %s (%s)", *iface, err)
 			os.Exit(1)
-		}
+		}*/
 		if err = ih.SetBufferSize(*b); err != nil {
 			log.Printf("unable to set timeout for %s (%s)", *iface, err)
+			os.Exit(1)
+		}
+		if err = ih.SetSnapLen(*s); err != nil {
+			log.Printf("unable to set snaplen for %s (%s)", *iface, err)
 			os.Exit(1)
 		}
 		if err = ih.SetPromisc(true); err != nil {
@@ -458,14 +481,15 @@ func main() {
 			log.Printf("unable to capture packets on interface %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		log.Printf("listening on %s, link-type %s, capture size %d, snaplen %d",
-			*iface, h.LinkType(), *b, *s)
+		log.Printf("listening on %s, link-type %s, capture size %d, snaplen %d, timestamp resolution %s",
+			*iface, h.LinkType(), *b, h.SnapLen(), h.Resolution().ToDuration())
 	} else {
 		if h, err = pcap.OpenOffline(*pf); err != nil {
 			log.Printf("unable to open pcap file \"%s\" (%s)", *pf, err)
 			os.Exit(1)
 		}
-		log.Printf("reading from file \"%s\", link-type %s", *pf, h.LinkType())
+		log.Printf("reading from file \"%s\", link-type %s, snaplen %d, timestamp resolution %s",
+			*pf, h.LinkType(), h.SnapLen(), h.Resolution().ToDuration())
 	}
 	defer func(h *pcap.Handle) {
 		h.Close()
