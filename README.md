@@ -153,7 +153,6 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 ## Todo
 
 - Implement reading without DecodingLayerParser for non-Ethernet links
-- Code cleanups:
-  - Optimize flow key copying
-  - Separate calculated state in FlowStats from recorded state
-  - Genericize IPv4/6 code where possible
+- Distinguish clearly between captured and real timescale stats, mainly for
+  packets per second and throughput
+- Add average packet length
