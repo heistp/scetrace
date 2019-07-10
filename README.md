@@ -152,12 +152,11 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 
 ## Todo
 
-- Test hardware timestamps on middlebox
 - Split IP, TCP, Ethernet and SCE stats
-- Make Flows TCP flows as we could also have flows for QUIC
-- Calculate variance and stddev of throughput and TCP RTT
-- Add a metric for burstiness
-- QUIC support
 - Distinguish clearly between captured and real timescale stats, mainly for
   packets per second and throughput, then emit both at end of both live capture
   and file parsing
+- Calculate variance and stddev of throughput and TCP RTT
+- Add a metric for burstiness
+- QUIC support
+- IRTT support

@@ -23,9 +23,6 @@ import (
 
 const DEFAULT_BUFFER_SIZE = 10 * 1024 * 1024
 
-// Preferred timestamp sources, in order (see pcap-tstamp(7)).
-var PREFERRED_TSTAMP_SOURCES = []string{"host_hiprec", "host", "adapter", "adapter_unsynced", "host_lowprec"}
-
 const DEFAULT_SNAPLEN = 128 // Ethernet VLAN (18), IPv6 (40), TCP max header len (60)
 
 type ECN uint8
@@ -440,20 +437,6 @@ func tstampSourceSupported(stss []pcap.TimestampSource, s string) (ts pcap.Times
 	return
 }
 
-func chooseTstampSource(stss []pcap.TimestampSource) (ts pcap.TimestampSource, ok bool) {
-	var err error
-	for _, ptstr := range PREFERRED_TSTAMP_SOURCES {
-		if ts, ok, err = tstampSourceSupported(stss, ptstr); err != nil {
-			log.Printf("skipping preferred timestamp source, unable to get for string %s (%s)", ptstr, err)
-			continue
-		}
-		if ok {
-			return
-		}
-	}
-	return
-}
-
 func supportedTstampSources(stss []pcap.TimestampSource) (s string) {
 	for i, sts := range stss {
 		if i > 0 {
@@ -479,7 +462,7 @@ func main() {
 	pf := flag.String("r", "", "pcap file to read packets from")
 	s := flag.Int("s", DEFAULT_SNAPLEN, "snaplen")
 	b := flag.Int("b", DEFAULT_BUFFER_SIZE, "pcap buffer size")
-	t := flag.String("t", "", "timestamp type, equivalent to tcpdump -j (see tcap-tstamp(7))")
+	j := flag.String("j", "", "timestamp source (see tcap-tstamp(7))")
 	flag.Parse()
 
 	if *iface != "" && *pf != "" {
@@ -523,13 +506,14 @@ func main() {
 			log.Printf("unable to set promiscuous mode for %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		if *t != "" {
-			if ts, ok, err = tstampSourceSupported(ih.SupportedTimestamps(), *t); err != nil {
-				log.Printf("unable to get timestamp source for string %s (%s)", *t, err)
+		if *j != "" {
+			if ts, ok, err = tstampSourceSupported(ih.SupportedTimestamps(), *j); err != nil {
+				log.Printf("unable to get timestamp source for string %s (supported sources: %s)",
+					*j, supportedTstampSources(ih.SupportedTimestamps()))
 				os.Exit(1)
 			}
 			if !ok {
-				log.Printf("timestamp source %s not supported (supported sources: %s)", *t,
+				log.Printf("timestamp source %s not supported (supported sources: %s)", *j,
 					supportedTstampSources(ih.SupportedTimestamps()))
 				os.Exit(1)
 			}
@@ -538,14 +522,7 @@ func main() {
 				os.Exit(1)
 			}
 			tstr = ts.String()
-		} else if ts, ok = chooseTstampSource(ih.SupportedTimestamps()); ok {
-			if err = ih.SetTimestampSource(ts); err != nil {
-				log.Printf("unable to set timestamp source %s for %s (%s), using default", ts, *iface, err)
-			} else {
-				tstr = ts.String()
-			}
 		}
-
 		if h, err = ih.Activate(); err != nil {
 			log.Printf("unable to capture packets on interface %s (%s)", *iface, err)
 			os.Exit(1)
