@@ -462,7 +462,7 @@ func main() {
 	pf := flag.String("r", "", "pcap file to read packets from")
 	s := flag.Int("s", DEFAULT_SNAPLEN, "snaplen")
 	b := flag.Int("b", DEFAULT_BUFFER_SIZE, "pcap buffer size")
-	j := flag.String("j", "", "timestamp source (see tcap-tstamp(7))")
+	t := flag.String("t", "", "timestamp source (see tcap-tstamp(7))")
 	flag.Parse()
 
 	if *iface != "" && *pf != "" {
@@ -506,14 +506,14 @@ func main() {
 			log.Printf("unable to set promiscuous mode for %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		if *j != "" {
-			if ts, ok, err = tstampSourceSupported(ih.SupportedTimestamps(), *j); err != nil {
+		if *t != "" {
+			if ts, ok, err = tstampSourceSupported(ih.SupportedTimestamps(), *t); err != nil {
 				log.Printf("unable to get timestamp source for string %s (supported sources: %s)",
-					*j, supportedTstampSources(ih.SupportedTimestamps()))
+					*t, supportedTstampSources(ih.SupportedTimestamps()))
 				os.Exit(1)
 			}
 			if !ok {
-				log.Printf("timestamp source %s not supported (supported sources: %s)", *j,
+				log.Printf("timestamp source %s not supported (supported sources: %s)", *t,
 					supportedTstampSources(ih.SupportedTimestamps()))
 				os.Exit(1)
 			}
