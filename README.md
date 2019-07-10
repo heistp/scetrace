@@ -152,10 +152,10 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 
 ## Todo
 
-- Split IP, TCP, Ethernet and SCE stats
 - Distinguish clearly between captured and real timescale stats, mainly for
   packets per second and throughput, then emit both at end of both live capture
   and file parsing
+- Split IP, TCP, Ethernet and SCE stats
 - Calculate variance and stddev of throughput and TCP RTT
 - Add a metric for burstiness
 - QUIC support
