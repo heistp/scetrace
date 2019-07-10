@@ -23,7 +23,10 @@ import (
 
 const DEFAULT_BUFFER_SIZE = 10 * 1024 * 1024
 
-const DEFAULT_SNAPLEN = 94 // Ethernet (14), IPv4 (20), TCP max options (60)
+// Preferred timestamp sources, in order (see pcap-tstamp(7)).
+var PREFERRED_TSTAMP_SOURCES = []string{"host_hiprec", "host", "adapter", "adapter_unsynced", "host_lowprec"}
+
+const DEFAULT_SNAPLEN = 128 // Ethernet VLAN (18), IPv6 (40), TCP max header len (60)
 
 type ECN uint8
 
@@ -424,11 +427,51 @@ func (r *Result) Emit() {
 	}
 }
 
+func tstampSourceSupported(stss []pcap.TimestampSource, s string) (ts pcap.TimestampSource, ok bool, err error) {
+	if ts, err = pcap.TimestampSourceFromString(s); err != nil {
+		return
+	}
+	for _, sts := range stss {
+		if sts == ts {
+			ok = true
+			return
+		}
+	}
+	return
+}
+
+func chooseTstampSource(stss []pcap.TimestampSource) (ts pcap.TimestampSource, ok bool) {
+	var err error
+	for _, ptstr := range PREFERRED_TSTAMP_SOURCES {
+		if ts, ok, err = tstampSourceSupported(stss, ptstr); err != nil {
+			log.Printf("skipping preferred timestamp source, unable to get for string %s (%s)", ptstr, err)
+			continue
+		}
+		if ok {
+			return
+		}
+	}
+	return
+}
+
+func supportedTstampSources(stss []pcap.TimestampSource) (s string) {
+	for i, sts := range stss {
+		if i > 0 {
+			s += ", "
+		}
+		s += sts.String()
+	}
+	if s == "" {
+		s = "none"
+	}
+	return
+}
+
 func main() {
 	log.SetFlags(0)
 
 	flag.Usage = func() {
-		fmt.Printf("usage: %s [-i iface] | [-r file] [-s snaplen] [-b bufsize] [filter expression]\n", os.Args[0])
+		fmt.Printf("usage: %s [-i iface] | [-r file] [-s snaplen] [-b bufsize] [-t tstamp_type] [filter expression]\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 
@@ -436,6 +479,7 @@ func main() {
 	pf := flag.String("r", "", "pcap file to read packets from")
 	s := flag.Int("s", DEFAULT_SNAPLEN, "snaplen")
 	b := flag.Int("b", DEFAULT_BUFFER_SIZE, "pcap buffer size")
+	t := flag.String("t", "", "timestamp type, equivalent to tcpdump -j (see tcap-tstamp(7))")
 	flag.Parse()
 
 	if *iface != "" && *pf != "" {
@@ -453,6 +497,9 @@ func main() {
 	var ih *pcap.InactiveHandle
 	var h *pcap.Handle
 	var err error
+	var ok bool
+	var ts pcap.TimestampSource
+	tstr := "default"
 	if *iface != "" {
 		if ih, err = pcap.NewInactiveHandle(*iface); err != nil {
 			log.Printf("unable to create handle for interface %s (%s)", *iface, err)
@@ -476,18 +523,41 @@ func main() {
 			log.Printf("unable to set promiscuous mode for %s (%s)", *iface, err)
 			os.Exit(1)
 		}
+		if *t != "" {
+			if ts, ok, err = tstampSourceSupported(ih.SupportedTimestamps(), *t); err != nil {
+				log.Printf("unable to get timestamp source for string %s (%s)", *t, err)
+				os.Exit(1)
+			}
+			if !ok {
+				log.Printf("timestamp source %s not supported (supported sources: %s)", *t,
+					supportedTstampSources(ih.SupportedTimestamps()))
+				os.Exit(1)
+			}
+			if err = ih.SetTimestampSource(ts); err != nil {
+				log.Printf("unable to set timestamp source %s for %s (%s)", ts, *iface, err)
+				os.Exit(1)
+			}
+			tstr = ts.String()
+		} else if ts, ok = chooseTstampSource(ih.SupportedTimestamps()); ok {
+			if err = ih.SetTimestampSource(ts); err != nil {
+				log.Printf("unable to set timestamp source %s for %s (%s), using default", ts, *iface, err)
+			} else {
+				tstr = ts.String()
+			}
+		}
+
 		if h, err = ih.Activate(); err != nil {
 			log.Printf("unable to capture packets on interface %s (%s)", *iface, err)
 			os.Exit(1)
 		}
-		log.Printf("listening on %s, link-type %s, capture size %d, snaplen %d, timestamp resolution %s",
-			*iface, h.LinkType(), *b, h.SnapLen(), h.Resolution().ToDuration())
+		log.Printf("listening on %s, link-type %s, capture size %d, snaplen %d, tstamp source %s, tstamp resolution %s",
+			*iface, h.LinkType(), *b, h.SnapLen(), tstr, h.Resolution().ToDuration())
 	} else {
 		if h, err = pcap.OpenOffline(*pf); err != nil {
 			log.Printf("unable to open pcap file \"%s\" (%s)", *pf, err)
 			os.Exit(1)
 		}
-		log.Printf("reading from file \"%s\", link-type %s, snaplen %d, timestamp resolution %s",
+		log.Printf("reading from file \"%s\", link-type %s, snaplen %d, tstamp resolution %s",
 			*pf, h.LinkType(), h.SnapLen(), h.Resolution().ToDuration())
 	}
 	defer func(h *pcap.Handle) {
