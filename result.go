@@ -77,8 +77,8 @@ func NewTCPFlowResult(d *TCPFlowData) (r *TCPFlowResult) {
 	updateOWR(r.Up, r.Down)
 	updateOWR(r.Down, r.Up)
 
-	r.MeanSeqRTTMillis = r.Up.MeanSeqRTTMillis + r.Down.MeanSeqRTTMillis
-	r.MeanTSValRTTMillis = r.Up.MeanTSValRTTMillis + r.Down.MeanTSValRTTMillis
+	r.MeanSeqRTTMillis = r.Up.RTTSeqMeanMillis + r.Down.RTTSeqMeanMillis
+	r.MeanTSValRTTMillis = r.Up.RTTMeanMillis + r.Down.RTTMeanMillis
 
 	return
 }
@@ -90,8 +90,8 @@ type TCPOneWayResult struct {
 	ESCEAckedBytesPercent float64
 	ElapsedAckTimeSeconds float64
 	MeanSegmentSizeBytes  float64
-	MeanSeqRTTMillis      float64
-	MeanTSValRTTMillis    float64
+	RTTSeqMeanMillis      float64
+	RTTMeanMillis         float64
 	ThroughputMbit        float64
 }
 
@@ -108,11 +108,11 @@ func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult
 	if r.AckedBytes > 0 {
 		r.ESCEAckedBytesPercent = 100 * float64(r.ESCEAckedBytes) / float64(r.AckedBytes)
 	}
-	if r.SeqRTTCount > 0 {
-		r.MeanSeqRTTMillis = float64(r.TotalSeqRTT.Nanoseconds()) / 1000000 / float64(r.SeqRTTCount)
+	if r.RTTCount > 0 {
+		r.RTTMeanMillis = float64(r.RTTTotal.Nanoseconds()) / 1000000 / float64(r.RTTCount)
 	}
-	if r.TSValRTTCount > 0 {
-		r.MeanTSValRTTMillis = float64(r.TotalTSValRTT.Nanoseconds()) / 1000000 / float64(r.TSValRTTCount)
+	if r.RTTSeqCount > 0 {
+		r.RTTSeqMeanMillis = float64(r.RTTSeqTotal.Nanoseconds()) / 1000000 / float64(r.RTTSeqCount)
 	}
 	if r.DataSegments > 0 {
 		r.MeanSegmentSizeBytes = float64(dr.AckedBytes) / float64(r.DataSegments)

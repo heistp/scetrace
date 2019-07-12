@@ -168,8 +168,8 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			if ackedBytes > 0 {
 				pack := tcp.Ack - uint32(ackedBytes)
 				if pt, ok := tor.SeqTimes[pack]; ok {
-					tor.TotalSeqRTT += tstamp.Sub(pt)
-					tor.SeqRTTCount++
+					tor.RTTSeqTotal += tstamp.Sub(pt)
+					tor.RTTSeqCount++
 					delete(tor.SeqTimes, pack)
 				}
 			}
@@ -182,8 +182,8 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 					tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
 					to.TSValTimes[tsval] = tstamp
 					if pt, ok := tor.TSValTimes[tsecr]; ok {
-						tor.TotalTSValRTT += tstamp.Sub(pt)
-						tor.TSValRTTCount++
+						tor.RTTTotal += tstamp.Sub(pt)
+						tor.RTTCount++
 						delete(tor.TSValTimes, tsecr)
 					}
 					break

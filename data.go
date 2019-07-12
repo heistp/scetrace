@@ -49,12 +49,12 @@ type TCPOneWayData struct {
 	ESCEAckedBytes uint64
 	FirstAckTime   time.Time
 	LastAckTime    time.Time
-	TSValTimes     map[uint32]time.Time `json:"-"`
-	TotalTSValRTT  time.Duration        `json:"-"`
-	TSValRTTCount  uint64               `json:"-"`
 	SeqTimes       map[uint32]time.Time `json:"-"`
-	TotalSeqRTT    time.Duration        `json:"-"`
-	SeqRTTCount    uint64               `json:"-"`
+	RTTSeqTotal    time.Duration        `json:"-"`
+	RTTSeqCount    uint64               `json:"-"`
+	TSValTimes     map[uint32]time.Time `json:"-"`
+	RTTTotal       time.Duration        `json:"-"`
+	RTTCount       uint64               `json:"-"`
 	AckSeen        bool                 `json:"-"`
 	PriorAck       uint32               `json:"-"`
 }
