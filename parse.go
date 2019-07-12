@@ -193,18 +193,24 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 		if isIP4 {
 			if ipLen-4*int(ip4.IHL)-4*int(tcp.DataOffset) > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
+				to.DataSegments++
 			}
 			dscp = ip4.TOS
 		} else {
 			// TODO calculate proper segment length
 			if ipLen-40 > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
+				to.DataSegments++
 			}
 			dscp = ip6.TrafficClass
 		}
 
+		if !to.PriorPacketTime.IsZero() {
+			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
+		}
+		to.PriorPacketTime = tstamp
+
 		if !tcp.SYN && !tcp.FIN && !tcp.RST {
-			to.DataSegments++
 			if tcp.CWR {
 				to.CWR++
 			}
