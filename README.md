@@ -13,7 +13,7 @@ Feel free to report any problems or feature requests as issues.
   - TCP throughput from pcap timestamps and acked bytes
   - TCP RTT using both TCP timestamp and TCP seqno methods
 - outputs JSON
-- uses gopacket DecodingLayerParser for high performance
+- uses gopacket DecodingLayerParser in lazy, no-copy mode for high performance
 
 ## Installation
 
@@ -152,11 +152,10 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 
 ## Todo
 
-- Distinguish clearly between captured and real timescale stats, mainly for
-  packets per second and throughput, then emit both at end of both live capture
-  and file parsing
+- Organize Result struct
+- See if there's a way to get all mutable values out of Data
 - Split IP, TCP, Ethernet and SCE stats
 - Calculate variance and stddev of throughput and TCP RTT
-- Add a metric for burstiness
+- Add a metric for burstiness of packet arrival times and SCE signaling
 - QUIC support
 - IRTT support
