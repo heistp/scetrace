@@ -60,13 +60,7 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			lastErr = nil
 		}
 
-		now := time.Now()
-
 		d.Lock()
-		if d.ParseFirstPacketTime.IsZero() {
-			d.ParseFirstPacketTime = now
-		}
-		d.ParseLastPacketTime = now
 
 		isTCP := false
 		isIP4 := true
@@ -78,6 +72,12 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 				isIP4 = false
 			}
 		}
+
+		tstamp := p.Metadata().Timestamp
+		if d.IPPackets == 0 {
+			d.CaptureStartTime = tstamp
+		}
+		d.CaptureEndTime = tstamp
 
 		d.IPPackets++
 		var ipLen int
@@ -149,12 +149,6 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			ts = f.Down
 			tsr = f.Up
 		}
-
-		tstamp := p.Metadata().Timestamp
-		if d.CaptureStartTime.IsZero() {
-			d.CaptureStartTime = tstamp
-		}
-		d.CaptureEndTime = tstamp
 
 		ackedBytes := uint64(0)
 		if tcp.ACK {

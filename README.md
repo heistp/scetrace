@@ -153,8 +153,8 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 94
 ## Todo
 
 - Organize Result struct
-- See if there's a way to get all mutable values out of Data
-- Split IP, TCP, Ethernet and SCE stats
+  - See if there's a way to get all mutable values out of Data
+  - Split IP, TCP, Ethernet and SCE stats
 - Calculate variance and stddev of throughput and TCP RTT
 - Add a metric for burstiness of packet arrival times and SCE signaling
 - QUIC support

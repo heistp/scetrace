@@ -11,17 +11,15 @@ import (
 
 type Data struct {
 	sync.Mutex
-	IPPackets            uint64
-	IPBytes              uint64
-	ParseStartTime       time.Time
-	ParseEndTime         time.Time
-	ParseFirstPacketTime time.Time
-	ParseLastPacketTime  time.Time
-	CaptureStartTime     time.Time
-	CaptureEndTime       time.Time
-	PCAPStats            *pcap.Stats              `json:",omitempty"`
-	TCP4                 map[TCP4FlowKey]*TCPFlow `json:"-"`
-	TCP6                 map[TCP6FlowKey]*TCPFlow `json:"-"`
+	IPPackets        uint64
+	IPBytes          uint64
+	ParseStartTime   time.Time
+	ParseEndTime     time.Time
+	CaptureStartTime time.Time
+	CaptureEndTime   time.Time
+	PCAPStats        *pcap.Stats              `json:",omitempty"`
+	TCP4             map[TCP4FlowKey]*TCPFlow `json:"-"`
+	TCP6             map[TCP6FlowKey]*TCPFlow `json:"-"`
 }
 
 func NewData() *Data {
