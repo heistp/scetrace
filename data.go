@@ -51,14 +51,16 @@ type TCPOneWayData struct {
 	ESCEAckedBytes  uint64
 	FirstAckTime    time.Time
 	LastAckTime     time.Time
+	PriorPacketTime time.Time `json:"-"`
+	PriorSCETime    time.Time `json:"-"`
 	IPG             DurationData
+	SCEIPG          DurationData
 	SeqTimes        map[uint32]time.Time `json:"-"`
 	SeqRTT          DurationData
 	TSValTimes      map[uint32]time.Time `json:"-"`
 	TSValRTT        DurationData
-	AckSeen         bool      `json:"-"`
-	PriorAck        uint32    `json:"-"`
-	PriorPacketTime time.Time `json:"-"`
+	AckSeen         bool   `json:"-"`
+	PriorAck        uint32 `json:"-"`
 }
 
 func NewTCPOneWayData() *TCPOneWayData {
@@ -144,7 +146,7 @@ func (s *DurationData) Variance() float64 {
 	return 0
 }
 
-func (s *DurationData) Dispersion() float64 {
+func (s *DurationData) Burstiness() float64 {
 	if s.mean != 0 {
 		return s.Variance() / s.mean
 	}
@@ -163,7 +165,7 @@ func (d *DurationData) MarshalJSON() ([]byte, error) {
 		Mean       float64
 		Stddev     float64
 		Variance   float64
-		Dispersion float64
+		Burstiness float64
 	}
 
 	j := DurationDataJSON{
@@ -173,7 +175,7 @@ func (d *DurationData) MarshalJSON() ([]byte, error) {
 		nsToMs(d.mean),
 		nsToMs(math.Sqrt(d.Variance())),
 		nsToMs(nsToMs(d.Variance())),
-		nsToMs(d.Dispersion()),
+		nsToMs(d.Burstiness()),
 	}
 
 	return json.Marshal(j)

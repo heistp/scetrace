@@ -225,6 +225,10 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			case NotECT:
 			case SCE:
 				to.SCE++
+				if !to.PriorSCETime.IsZero() {
+					to.SCEIPG.Push(tstamp.Sub(to.PriorSCETime))
+				}
+				to.PriorSCETime = tstamp
 			case ECT:
 			case CE:
 				to.CE++
