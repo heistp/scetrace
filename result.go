@@ -97,10 +97,10 @@ func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult
 	r = &TCPOneWayResult{TCPOneWayData: d}
 
 	r.ElapsedAckTimeSeconds = r.LastAckTime.Sub(r.FirstAckTime).Seconds()
-	if r.SCE > 0 {
+	if r.DataSegments > 0 {
 		r.SCEPercent = 100 * float64(r.SCE) / float64(r.DataSegments)
 	}
-	if r.ESCE > 0 {
+	if r.DataSegments > 0 {
 		r.ESCEPercent = 100 * float64(r.ESCE) / float64(r.DataSegments)
 	}
 	if r.AckedBytes > 0 {
