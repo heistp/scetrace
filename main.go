@@ -26,8 +26,8 @@ func run(pc *PCAP) {
 		defer func() {
 			data.Unlock()
 		}()
-		data.ParseEndTime = time.Now()
-		data.PCAPStats, _ = pc.Stats()
+		data.Meta.ParseEndTime = time.Now()
+		data.Meta.PCAPStats, _ = pc.Stats()
 		NewResult(data).Emit()
 	}
 

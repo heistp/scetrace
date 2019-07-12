@@ -23,8 +23,8 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 	var ip4 layers.IPv4
 	var ip6 layers.IPv6
 	var tcp layers.TCP
-	var ts *TCPStats
-	var tsr *TCPStats
+	var to *TCPOneWayData
+	var tor *TCPOneWayData
 	var tk4 TCP4FlowKey
 	var tk6 TCP6FlowKey
 	var lastErr error
@@ -40,7 +40,7 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 	parser.AddDecodingLayer(&tcp)
 	dec := []gopacket.LayerType{}
 
-	d.ParseStartTime = time.Now()
+	d.Meta.ParseStartTime = time.Now()
 
 	for p := range pch {
 		if err := parser.DecodeLayers(p.Data(), &dec); err != nil {
@@ -74,26 +74,26 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 		}
 
 		tstamp := p.Metadata().Timestamp
-		if d.IPPackets == 0 {
-			d.CaptureStartTime = tstamp
+		if d.IP.Packets == 0 {
+			d.Meta.CaptureStartTime = tstamp
 		}
-		d.CaptureEndTime = tstamp
+		d.Meta.CaptureEndTime = tstamp
 
-		d.IPPackets++
+		d.IP.Packets++
 		var ipLen int
 		if isIP4 {
 			ipLen = int(ip4.Length)
 		} else {
 			ipLen = int(ip6.Length) + 40
 		}
-		d.IPBytes += uint64(ipLen)
+		d.IP.Bytes += uint64(ipLen)
 
 		if !isTCP {
 			continue
 		}
 
 		var ok, rok bool
-		var f *TCPFlow
+		var f *TCPFlowData
 		up := true
 
 		if isIP4 {
@@ -103,14 +103,14 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			tk4.DstPort = tcp.DstPort
 			if f, ok = d.TCP4[tk4]; !ok {
 				if f, rok = d.TCP4[tk4.Reverse()]; !rok {
-					f = &TCPFlow{
+					f = &TCPFlowData{
 						Index:   flowIndex,
 						SrcIP:   ip4.SrcIP,
 						DstIP:   ip4.DstIP,
 						SrcPort: tcp.SrcPort,
 						DstPort: tcp.DstPort,
-						Up:      NewTCPStats(),
-						Down:    NewTCPStats(),
+						Up:      NewTCPOneWayData(),
+						Down:    NewTCPOneWayData(),
 					}
 					d.TCP4[tk4] = f
 					flowIndex++
@@ -125,14 +125,14 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			tk6.DstPort = tcp.DstPort
 			if f, ok = d.TCP6[tk6]; !ok {
 				if f, rok = d.TCP6[tk6.Reverse()]; !rok {
-					f = &TCPFlow{
+					f = &TCPFlowData{
 						Index:   flowIndex,
 						SrcIP:   ip6.SrcIP,
 						DstIP:   ip6.DstIP,
 						SrcPort: tcp.SrcPort,
 						DstPort: tcp.DstPort,
-						Up:      NewTCPStats(),
-						Down:    NewTCPStats(),
+						Up:      NewTCPOneWayData(),
+						Down:    NewTCPOneWayData(),
 					}
 					d.TCP6[tk6] = f
 					flowIndex++
@@ -143,34 +143,34 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 		}
 
 		if up {
-			ts = f.Up
-			tsr = f.Down
+			to = f.Up
+			tor = f.Down
 		} else {
-			ts = f.Down
-			tsr = f.Up
+			to = f.Down
+			tor = f.Up
 		}
 
 		ackedBytes := uint64(0)
 		if tcp.ACK {
-			if ts.AckSeen {
-				ackedBytes = uint64(tcp.Ack - ts.PriorAck)
-				ts.AckedBytes += ackedBytes
+			if to.AckSeen {
+				ackedBytes = uint64(tcp.Ack - to.PriorAck)
+				to.AckedBytes += ackedBytes
 				if ackedBytes > 0 {
-					ts.LastAckTime = tstamp
+					to.LastAckTime = tstamp
 				}
 			} else {
-				ts.AckSeen = true
-				ts.FirstAckTime = tstamp
-				ts.LastAckTime = tstamp
+				to.AckSeen = true
+				to.FirstAckTime = tstamp
+				to.LastAckTime = tstamp
 			}
-			ts.PriorAck = tcp.Ack
+			to.PriorAck = tcp.Ack
 
 			if ackedBytes > 0 {
 				pack := tcp.Ack - uint32(ackedBytes)
-				if pt, ok := tsr.SeqTimes[pack]; ok {
-					tsr.TotalSeqRTT += tstamp.Sub(pt)
-					tsr.SeqRTTCount++
-					delete(tsr.SeqTimes, pack)
+				if pt, ok := tor.SeqTimes[pack]; ok {
+					tor.TotalSeqRTT += tstamp.Sub(pt)
+					tor.SeqRTTCount++
+					delete(tor.SeqTimes, pack)
 				}
 			}
 
@@ -180,11 +180,11 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 					opt.OptionLength == 10 {
 					tsval = binary.BigEndian.Uint32(opt.OptionData[:4])
 					tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
-					ts.TSValTimes[tsval] = tstamp
-					if pt, ok := tsr.TSValTimes[tsecr]; ok {
-						tsr.TotalTSValRTT += tstamp.Sub(pt)
-						tsr.TSValRTTCount++
-						delete(tsr.TSValTimes, tsecr)
+					to.TSValTimes[tsval] = tstamp
+					if pt, ok := tor.TSValTimes[tsecr]; ok {
+						tor.TotalTSValRTT += tstamp.Sub(pt)
+						tor.TSValRTTCount++
+						delete(tor.TSValTimes, tsecr)
 					}
 					break
 				}
@@ -194,40 +194,40 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 		var dscp uint8
 		if isIP4 {
 			if ipLen-4*int(ip4.IHL)-4*int(tcp.DataOffset) > 0 {
-				ts.SeqTimes[tcp.Seq] = tstamp
+				to.SeqTimes[tcp.Seq] = tstamp
 			}
 			dscp = ip4.TOS
 		} else {
 			// TODO calculate proper segment length
 			if ipLen-40 > 0 {
-				ts.SeqTimes[tcp.Seq] = tstamp
+				to.SeqTimes[tcp.Seq] = tstamp
 			}
 			dscp = ip6.TrafficClass
 		}
 
 		if !tcp.SYN && !tcp.FIN && !tcp.RST {
-			ts.DataSegments++
+			to.DataSegments++
 			if tcp.CWR {
-				ts.CWR++
+				to.CWR++
 			}
 			if tcp.ECE {
-				ts.ECE++
+				to.ECE++
 			}
 			if tcp.NS {
-				ts.ESCE++
-				ts.ESCEAckedBytes += ackedBytes
+				to.ESCE++
+				to.ESCEAckedBytes += ackedBytes
 			}
 			switch ECN(dscp & 0x03) {
 			case NotECT:
 			case SCE:
-				ts.SCE++
+				to.SCE++
 			case ECT:
 			case CE:
-				ts.CE++
+				to.CE++
 			}
 		}
 
-		ts.Segments++
+		to.Segments++
 		d.Unlock()
 	}
 
