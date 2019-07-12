@@ -163,6 +163,5 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 118, tst
 
 ## Todo
 
-- Calculate variance and stddev of throughput and TCP RTT
 - Add a metric for burstiness of packet arrival times and SCE signaling
 - Protocol support: QUIC, ICMP, IRTT
