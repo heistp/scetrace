@@ -163,5 +163,4 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 118, tst
 
 ## Todo
 
-- Add a duration stat for SCE arrival times
 - Protocol support: QUIC, ICMP, IRTT

@@ -221,17 +221,21 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 				to.ESCE++
 				to.ESCEAckedBytes += ackedBytes
 			}
-			switch ECN(dscp & 0x03) {
-			case NotECT:
-			case SCE:
+
+			ecn := ECN(dscp & 0x03)
+			if ecn == CE {
+				to.CE++
+			}
+			if ecn == SCE {
 				to.SCE++
 				if !to.PriorSCETime.IsZero() {
 					to.SCEIPG.Push(tstamp.Sub(to.PriorSCETime))
 				}
 				to.PriorSCETime = tstamp
-			case ECT:
-			case CE:
-				to.CE++
+				to.SCERunCount++
+			} else if to.SCERunCount > 0 {
+				to.SCERunLength.Push(float64(to.SCERunCount))
+				to.SCERunCount = 0
 			}
 		}
 

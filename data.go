@@ -53,6 +53,8 @@ type TCPOneWayData struct {
 	LastAckTime     time.Time
 	PriorPacketTime time.Time `json:"-"`
 	PriorSCETime    time.Time `json:"-"`
+	SCERunCount     uint      `json:"-"`
+	SCERunLength    Float64Data
 	IPG             DurationData
 	SCEIPG          DurationData
 	SeqTimes        map[uint32]time.Time `json:"-"`
@@ -112,49 +114,49 @@ type DurationData struct {
 	mean float64
 }
 
-func (s *DurationData) Push(d time.Duration) {
-	if s.N == 0 {
-		s.Min = d
-		s.Max = d
+func (u *DurationData) Push(d time.Duration) {
+	if u.N == 0 {
+		u.Min = d
+		u.Max = d
 	} else {
-		if d < s.Min {
-			s.Min = d
+		if d < u.Min {
+			u.Min = d
 		}
-		if d > s.Max {
-			s.Max = d
+		if d > u.Max {
+			u.Max = d
 		}
 	}
-	s.N++
-	om := s.mean
+	u.N++
+	om := u.mean
 	fd := float64(d)
-	s.mean += (fd - om) / float64(s.N)
-	s.s += (fd - om) * (fd - s.mean)
+	u.mean += (fd - om) / float64(u.N)
+	u.s += (fd - om) * (fd - u.mean)
 }
 
-func (s *DurationData) IsZero() bool {
-	return s.N == 0
+func (d *DurationData) IsZero() bool {
+	return d.N == 0
 }
 
-func (s *DurationData) Mean() time.Duration {
-	return time.Duration(s.mean)
+func (d *DurationData) Mean() time.Duration {
+	return time.Duration(d.mean)
 }
 
-func (s *DurationData) Variance() float64 {
-	if s.N > 1 {
-		return s.s / float64(s.N-1)
+func (d *DurationData) Variance() float64 {
+	if d.N > 1 {
+		return d.s / float64(d.N-1)
 	}
 	return 0
 }
 
-func (s *DurationData) Burstiness() float64 {
-	if s.mean != 0 {
-		return s.Variance() / s.mean
+func (d *DurationData) Burstiness() float64 {
+	if d.mean != 0 {
+		return d.Variance() / d.mean
 	}
 	return 0
 }
 
-func (s *DurationData) Stddev() time.Duration {
-	return time.Duration(math.Sqrt(s.Variance()))
+func (d *DurationData) Stddev() time.Duration {
+	return time.Duration(math.Sqrt(d.Variance()))
 }
 
 func (d *DurationData) MarshalJSON() ([]byte, error) {
@@ -166,6 +168,10 @@ func (d *DurationData) MarshalJSON() ([]byte, error) {
 		Stddev     float64
 		Variance   float64
 		Burstiness float64
+	}
+
+	if d.N == 0 {
+		return json.Marshal(struct{}{})
 	}
 
 	j := DurationDataJSON{
@@ -187,4 +193,87 @@ func nsToMs(ns float64) float64 {
 
 func durToMs(d time.Duration) float64 {
 	return nsToMs(float64(d.Nanoseconds()))
+}
+
+// Float64Data records min, max, mean and variance for a float64.
+type Float64Data struct {
+	N    uint64
+	Min  float64
+	Max  float64
+	m    float64
+	s    float64
+	mean float64
+}
+
+func (d *Float64Data) Push(f float64) {
+	if d.N == 0 {
+		d.Min = f
+		d.Max = f
+	} else {
+		if f < d.Min {
+			d.Min = f
+		}
+		if f > d.Max {
+			d.Max = f
+		}
+	}
+	d.N++
+	om := d.mean
+	fd := f
+	d.mean += (fd - om) / float64(d.N)
+	d.s += (fd - om) * (fd - d.mean)
+}
+
+func (d *Float64Data) IsZero() bool {
+	return d.N == 0
+}
+
+func (d *Float64Data) Mean() float64 {
+	return d.mean
+}
+
+func (d *Float64Data) Variance() float64 {
+	if d.N > 1 {
+		return d.s / float64(d.N-1)
+	}
+	return 0
+}
+
+func (d *Float64Data) Burstiness() float64 {
+	if d.mean != 0 {
+		return d.Variance() / d.mean
+	}
+	return 0
+}
+
+func (d *Float64Data) Stddev() float64 {
+	return math.Sqrt(d.Variance())
+}
+
+func (d *Float64Data) MarshalJSON() ([]byte, error) {
+	type Float64DataJSON struct {
+		N          uint64
+		Min        float64
+		Max        float64
+		Mean       float64
+		Stddev     float64
+		Variance   float64
+		Burstiness float64
+	}
+
+	if d.N == 0 {
+		return json.Marshal(struct{}{})
+	}
+
+	j := Float64DataJSON{
+		d.N,
+		d.Min,
+		d.Max,
+		d.Mean(),
+		d.Stddev(),
+		d.Variance(),
+		d.Burstiness(),
+	}
+
+	return json.Marshal(j)
 }
