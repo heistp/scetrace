@@ -13,6 +13,8 @@ Feel free to report any problems or feature requests as issues.
   - TCP throughput from pcap timestamps and acked bytes
   - TCP RTT using both TSVal and TCP seqno methods
   - IPG for all packets and separately only SCE marked packets
+  - min, max, mean, stddev, variance and burstiness (index of dispersion) for
+    all RTT, IPG and SCE run length stats
   - metadata for capture and parsing times
 - outputs JSON
 - uses gopacket DecodingLayerParser in lazy, no-copy mode for high performance
