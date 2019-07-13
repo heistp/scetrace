@@ -286,6 +286,7 @@ listening on enp2s0, link-type Ethernet, capture size 10485760, snaplen 96, tsta
 
 ## Todo
 
-- IPG, SCE IPG and run length at IP level
+- Formatted text output
 - Per-packet and windowed output for plotting
+- IPG, SCE IPG and run length at IP level
 - Protocol support: QUIC, ICMP, IRTT
