@@ -23,7 +23,7 @@ Feel free to report any problems or feature requests as issues.
 
 Install instructions:
 
-1. Install libpcap and libpcap-dev
+1. Install libpcap-dev (e.g. `sudo apt-get install libpcap-dev`)
 2. [Install Go](https://golang.org/dl/)
 3. Install scetrace: `go get -u github.com/heistp/scetrace; go install github.com/heistp/scetrace`
 4. Make sure location of scetrace is in your `PATH` (by default `~/go/bin`)
