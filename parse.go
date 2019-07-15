@@ -89,6 +89,7 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 		d.IP.Bytes += uint64(ipLen)
 
 		if !isTCP {
+			d.Unlock()
 			continue
 		}
 
