@@ -47,6 +47,7 @@ type TCPOneWayData struct {
 	CWR             uint64
 	Segments        uint64
 	DataSegments    uint64
+	Acks            uint64
 	AckedBytes      uint64
 	ESCEAckedBytes  uint64
 	FirstAckTime    time.Time

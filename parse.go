@@ -153,6 +153,7 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 
 		ackedBytes := uint64(0)
 		if tcp.ACK {
+			to.Acks++
 			if to.AckSeen {
 				ackedBytes = uint64(tcp.Ack - to.PriorAck)
 				to.AckedBytes += ackedBytes
