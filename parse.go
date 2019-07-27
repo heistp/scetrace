@@ -191,6 +191,11 @@ func Parse(pch <-chan gopacket.Packet, d *Data) {
 			}
 		}
 
+		if tcp.Seq < to.PriorSeq {
+			to.LateSegments++
+		}
+		to.PriorSeq = tcp.Seq
+
 		var dscp uint8
 		if isIP4 {
 			if ipLen-4*int(ip4.IHL)-4*int(tcp.DataOffset) > 0 {

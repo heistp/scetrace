@@ -50,6 +50,7 @@ type TCPOneWayData struct {
 	Acks            uint64
 	AckedBytes      uint64
 	ESCEAckedBytes  uint64
+	LateSegments    uint64
 	FirstAckTime    time.Time
 	LastAckTime     time.Time
 	PriorPacketTime time.Time `json:"-"`
@@ -64,6 +65,7 @@ type TCPOneWayData struct {
 	TSValRTT        DurationData
 	AckSeen         bool   `json:"-"`
 	PriorAck        uint32 `json:"-"`
+	PriorSeq        uint32 `json:"-"`
 }
 
 func NewTCPOneWayData() *TCPOneWayData {
