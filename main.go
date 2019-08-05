@@ -47,7 +47,7 @@ func run(pc *PCAP) {
 
 	go pc.Drain(pch)
 
-	Parse(pch, data)
+	Capture(pch, data)
 	emit()
 }
 

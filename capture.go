@@ -18,7 +18,7 @@ const (
 	CE     ECN = 0x03
 )
 
-func Parse(pch <-chan gopacket.Packet, d *Data) {
+func Capture(pch <-chan gopacket.Packet, d *Data) {
 	var eth layers.Ethernet
 	var ip4 layers.IPv4
 	var ip6 layers.IPv6

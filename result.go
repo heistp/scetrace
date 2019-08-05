@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Result contains Data plus post-processed statistics.
 type Result struct {
 	*Data
 	TCP  []*TCPFlowResult

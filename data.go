@@ -11,6 +11,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+// Data holds the information obtained during capture.
 type Data struct {
 	sync.Mutex
 	IP   IPData
