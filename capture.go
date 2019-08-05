@@ -151,6 +151,14 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			tor = f.Up
 		}
 
+		if tcp.SYN {
+			if tcp.ACK {
+				f.ECNAccepted = tcp.ECE
+			} else {
+				f.ECNInitiated = tcp.ECE && tcp.CWR
+			}
+		}
+
 		ackedBytes := uint64(0)
 		if tcp.ACK {
 			to.Acks++

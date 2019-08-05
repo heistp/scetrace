@@ -78,13 +78,15 @@ func NewTCPOneWayData() *TCPOneWayData {
 }
 
 type TCPFlowData struct {
-	Index   int `json:"-"`
-	SrcIP   net.IP
-	SrcPort layers.TCPPort
-	DstIP   net.IP
-	DstPort layers.TCPPort
-	Up      *TCPOneWayData
-	Down    *TCPOneWayData
+	Index        int `json:"-"`
+	SrcIP        net.IP
+	SrcPort      layers.TCPPort
+	DstIP        net.IP
+	DstPort      layers.TCPPort
+	ECNInitiated bool
+	ECNAccepted  bool
+	Up           *TCPOneWayData
+	Down         *TCPOneWayData
 }
 
 type TCP4FlowKey struct {
