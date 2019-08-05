@@ -191,26 +191,32 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			}
 		}
 
-		if tcp.Seq < to.PriorSeq {
-			to.LateSegments++
-		}
-		to.PriorSeq = tcp.Seq
-
 		var dscp uint8
+		var segLen int
 		if isIP4 {
-			if ipLen-4*int(ip4.IHL)-4*int(tcp.DataOffset) > 0 {
+			segLen = ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset)
+			if segLen > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
 				to.DataSegments++
 			}
 			dscp = ip4.TOS
 		} else {
 			// TODO calculate proper segment length
-			if ipLen-40 > 0 {
+			segLen = ipLen - 40
+			if segLen > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
 				to.DataSegments++
 			}
 			dscp = ip6.TrafficClass
 		}
+
+		if tcp.Seq < to.PriorSeq {
+			to.LateSegments++
+		}
+		if segLen > 0 && tcp.Seq > to.PriorSeq+uint32(segLen) {
+			to.Gaps++
+		}
+		to.PriorSeq = tcp.Seq
 
 		if !to.PriorPacketTime.IsZero() {
 			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
@@ -247,6 +253,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		}
 
 		to.Segments++
+
 		d.Unlock()
 	}
 

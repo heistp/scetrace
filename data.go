@@ -52,6 +52,7 @@ type TCPOneWayData struct {
 	AckedBytes      uint64
 	ESCEAckedBytes  uint64
 	LateSegments    uint64
+	Gaps            uint64
 	FirstAckTime    time.Time
 	LastAckTime     time.Time
 	PriorPacketTime time.Time `json:"-"`
