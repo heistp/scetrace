@@ -187,29 +187,27 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		}
 
 		// handle acks
-		var ackedBytes uint64
+		var ackedBytes uint32
 		if tcp.ACK {
-			to.Acks++
-			if to.AckSeen {
-				ackedBytes = uint64(tcp.Ack - to.PriorAck)
-				to.AckedBytes += ackedBytes
-				if ackedBytes > 0 {
+			if to.Acks > 0 {
+				ackedBytes = tcp.Ack - to.HiAck
+				if ackedBytes < math.MaxUint32/2 {
+					to.AckedBytes += uint64(ackedBytes)
 					to.LastAckTime = tstamp
+					if pt, ok := tor.SeqTimes[to.HiAck]; ok {
+						tor.SeqRTT.Push(tstamp.Sub(pt))
+						delete(tor.SeqTimes, to.HiAck)
+					}
+					to.HiAck = tcp.Ack
+				} else {
+					ackedBytes = 0
 				}
 			} else {
-				to.AckSeen = true
 				to.FirstAckTime = tstamp
 				to.LastAckTime = tstamp
+				to.HiAck = tcp.Ack
 			}
-			to.PriorAck = tcp.Ack
-
-			if ackedBytes > 0 {
-				pack := tcp.Ack - uint32(ackedBytes)
-				if pt, ok := tor.SeqTimes[pack]; ok {
-					tor.SeqRTT.Push(tstamp.Sub(pt))
-					delete(tor.SeqTimes, pack)
-				}
-			}
+			to.Acks++
 		}
 
 		// get dscp and segment length according to IP version
@@ -263,7 +261,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			}
 			if tcp.NS {
 				to.ESCE++
-				to.ESCEAckedBytes += ackedBytes
+				to.ESCEAckedBytes += uint64(ackedBytes)
 			}
 
 			ecn := ECN(dscp & 0x03)

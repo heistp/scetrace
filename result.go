@@ -72,7 +72,7 @@ func NewTCPFlowResult(d *TCPFlowData) (r *TCPFlowResult) {
 	// update some inter-dependent stats after creation
 	updateOWR := func(o *TCPOneWayResult, or *TCPOneWayResult) {
 		if o.AckedBytes > 0 && o.ElapsedAckTimeSeconds > 0 {
-			or.ThroughputMbit = float64(o.AckedBytes) * 8 / 1000000 / o.ElapsedAckTimeSeconds
+			or.GoodputMbit = float64(o.AckedBytes) * 8 / 1000000 / o.ElapsedAckTimeSeconds
 		}
 	}
 	updateOWR(r.Up, r.Down)
@@ -94,7 +94,7 @@ type TCPOneWayResult struct {
 	RetransmittedPercent  float64
 	ElapsedAckTimeSeconds float64
 	MeanSegmentSizeBytes  float64
-	ThroughputMbit        float64
+	GoodputMbit           float64
 }
 
 func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult) {

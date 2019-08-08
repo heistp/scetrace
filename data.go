@@ -66,8 +66,7 @@ type TCPOneWayData struct {
 	SeqRTT                DurationData
 	TSValTimes            map[uint32]time.Time `json:"-"`
 	TSValRTT              DurationData
-	AckSeen               bool   `json:"-"`
-	PriorAck              uint32 `json:"-"`
+	HiAck                 uint32 `json:"-"`
 	ExpSeq                uint32 `json:"-"`
 	HiTSVal               uint32 `json:"-"`
 }
