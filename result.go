@@ -91,7 +91,7 @@ type TCPOneWayResult struct {
 	ESCEAckedBytesPercent float64
 	AckPercent            float64
 	LatePercent           float64
-	GapsPercent           float64
+	RetransmittedPercent  float64
 	ElapsedAckTimeSeconds float64
 	MeanSegmentSizeBytes  float64
 	ThroughputMbit        float64
@@ -116,8 +116,8 @@ func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult
 	if r.Segments > 0 {
 		r.LatePercent = 100 * float64(r.LateSegments) / float64(r.Segments)
 	}
-	if r.DataSegments > 0 {
-		r.GapsPercent = 100 * float64(r.Gaps) / float64(r.DataSegments)
+	if r.Segments > 0 {
+		r.RetransmittedPercent = 100 * float64(r.RetransmittedSegments) / float64(r.Segments)
 	}
 	if r.DataSegments > 0 {
 		r.MeanSegmentSizeBytes = float64(dr.AckedBytes) / float64(r.DataSegments)

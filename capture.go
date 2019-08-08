@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"log"
+	"math"
 	"time"
 
 	"github.com/google/gopacket"
@@ -43,6 +44,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 	d.Meta.ParseStartTime = time.Now()
 
 	for p := range pch {
+		// decode packet
 		if err := parser.DecodeLayers(p.Data(), &dec); err != nil {
 			if lastErr != nil && err.Error() == lastErr.Error() {
 				lastErrCount++
@@ -60,8 +62,10 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			lastErr = nil
 		}
 
+		// lock data while updating
 		d.Lock()
 
+		// identify parsed layers
 		isTCP := false
 		isIP4 := true
 		for _, lt := range dec {
@@ -73,12 +77,14 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			}
 		}
 
+		// get timestamp and update capture times
 		tstamp := p.Metadata().Timestamp
 		if d.IP.Packets == 0 {
 			d.Meta.CaptureStartTime = tstamp
 		}
 		d.Meta.CaptureEndTime = tstamp
 
+		// update IP stats
 		d.IP.Packets++
 		var ipLen int
 		if isIP4 {
@@ -88,15 +94,16 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		}
 		d.IP.Bytes += uint64(ipLen)
 
+		// go to next packet if not TCP
 		if !isTCP {
 			d.Unlock()
 			continue
 		}
 
+		// get addresses and ports for flow identification
 		var ok, rok bool
 		var f *TCPFlowData
 		up := true
-
 		if isIP4 {
 			copy(tk4.SrcIP[:], ip4.SrcIP)
 			tk4.SrcPort = tcp.SrcPort
@@ -143,6 +150,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			}
 		}
 
+		// set one-way stats pointers based on direction
 		if up {
 			to = f.Up
 			tor = f.Down
@@ -151,15 +159,35 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			tor = f.Up
 		}
 
+		// read timestamps
+		var tsval, tsecr uint32
+		for _, opt := range tcp.Options {
+			if opt.OptionType == layers.TCPOptionKindTimestamps &&
+				opt.OptionLength == 10 {
+				tsval = binary.BigEndian.Uint32(opt.OptionData[:4])
+				tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
+				to.TSValTimes[tsval] = tstamp
+				if pt, ok := tor.TSValTimes[tsecr]; ok {
+					tor.TSValRTT.Push(tstamp.Sub(pt))
+					delete(tor.TSValTimes, tsecr)
+				}
+				break
+			}
+		}
+
+		// handle connection initiation
 		if tcp.SYN {
 			if tcp.ACK {
 				f.ECNAccepted = tcp.ECE
 			} else {
 				f.ECNInitiated = tcp.ECE && tcp.CWR
 			}
+			to.ExpSeq = tcp.Seq + 1
+			to.PriorTSVal = tsval
 		}
 
-		ackedBytes := uint64(0)
+		// handle acks
+		var ackedBytes uint64
 		if tcp.ACK {
 			to.Acks++
 			if to.AckSeen {
@@ -182,27 +210,13 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 					delete(tor.SeqTimes, pack)
 				}
 			}
-
-			var tsval, tsecr uint32
-			for _, opt := range tcp.Options {
-				if opt.OptionType == layers.TCPOptionKindTimestamps &&
-					opt.OptionLength == 10 {
-					tsval = binary.BigEndian.Uint32(opt.OptionData[:4])
-					tsecr = binary.BigEndian.Uint32(opt.OptionData[4:])
-					to.TSValTimes[tsval] = tstamp
-					if pt, ok := tor.TSValTimes[tsecr]; ok {
-						tor.TSValRTT.Push(tstamp.Sub(pt))
-						delete(tor.TSValTimes, tsecr)
-					}
-					break
-				}
-			}
 		}
 
+		// get dscp and segment length according to IP version
 		var dscp uint8
-		var segLen int
+		var segLen uint32
 		if isIP4 {
-			segLen = ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset)
+			segLen = uint32(ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset))
 			if segLen > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
 				to.DataSegments++
@@ -210,7 +224,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			dscp = ip4.TOS
 		} else {
 			// TODO calculate proper segment length
-			segLen = ipLen - 40
+			segLen = uint32(ipLen - 40)
 			if segLen > 0 {
 				to.SeqTimes[tcp.Seq] = tstamp
 				to.DataSegments++
@@ -218,19 +232,27 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			dscp = ip6.TrafficClass
 		}
 
-		if tcp.Seq < to.PriorSeq {
-			to.LateSegments++
-		}
-		if segLen > 0 && tcp.Seq > to.PriorSeq+uint32(segLen) {
-			to.Gaps++
-		}
-		to.PriorSeq = tcp.Seq
+		// detect retransmitted and late (out-of-order) segments
+		if !tcp.SYN {
+			if tcp.Seq-to.ExpSeq < math.MaxUint32/2 {
+				to.ExpSeq = tcp.Seq + segLen
+			} else {
+				to.RetransmittedSegments++
+			}
 
+			if tsval-to.PriorTSVal > math.MaxUint32/2 {
+				to.LateSegments++
+			}
+			to.PriorTSVal = tsval
+		}
+
+		// record inter-packet gap stats
 		if !to.PriorPacketTime.IsZero() {
 			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
 		}
 		to.PriorPacketTime = tstamp
 
+		// record congestion related stats
 		if !tcp.SYN && !tcp.FIN && !tcp.RST {
 			if tcp.CWR {
 				to.CWR++
@@ -260,8 +282,10 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			}
 		}
 
+		// increment segment count
 		to.Segments++
 
+		// unlock data
 		d.Unlock()
 	}
 

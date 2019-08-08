@@ -41,33 +41,35 @@ type MetaData struct {
 }
 
 type TCPOneWayData struct {
-	CE              uint64
-	SCE             uint64
-	ESCE            uint64
-	ECE             uint64
-	CWR             uint64
-	Segments        uint64
-	DataSegments    uint64
-	Acks            uint64
-	AckedBytes      uint64
-	ESCEAckedBytes  uint64
-	LateSegments    uint64
-	Gaps            uint64
-	FirstAckTime    time.Time
-	LastAckTime     time.Time
-	PriorPacketTime time.Time `json:"-"`
-	PriorSCETime    time.Time `json:"-"`
-	SCERunCount     uint      `json:"-"`
-	SCERunLength    Float64Data
-	IPG             DurationData
-	SCEIPG          DurationData
-	SeqTimes        map[uint32]time.Time `json:"-"`
-	SeqRTT          DurationData
-	TSValTimes      map[uint32]time.Time `json:"-"`
-	TSValRTT        DurationData
-	AckSeen         bool   `json:"-"`
-	PriorAck        uint32 `json:"-"`
-	PriorSeq        uint32 `json:"-"`
+	CE                    uint64
+	SCE                   uint64
+	ESCE                  uint64
+	ECE                   uint64
+	CWR                   uint64
+	Segments              uint64
+	DataSegments          uint64
+	Acks                  uint64
+	AckedBytes            uint64
+	ESCEAckedBytes        uint64
+	LateSegments          uint64
+	RetransmittedSegments uint64
+	Overlappers           uint64 `json:",omitempty"`
+	FirstAckTime          time.Time
+	LastAckTime           time.Time
+	PriorPacketTime       time.Time `json:"-"`
+	PriorSCETime          time.Time `json:"-"`
+	SCERunCount           uint      `json:"-"`
+	SCERunLength          Float64Data
+	IPG                   DurationData
+	SCEIPG                DurationData
+	SeqTimes              map[uint32]time.Time `json:"-"`
+	SeqRTT                DurationData
+	TSValTimes            map[uint32]time.Time `json:"-"`
+	TSValRTT              DurationData
+	AckSeen               bool   `json:"-"`
+	PriorAck              uint32 `json:"-"`
+	ExpSeq                uint32 `json:"-"`
+	PriorTSVal            uint32 `json:"-"`
 }
 
 func NewTCPOneWayData() *TCPOneWayData {
@@ -283,4 +285,11 @@ func (d *Float64Data) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(j)
+}
+
+// Gap stores a hole in the received packets.
+type Gap struct {
+	Seq    uint32
+	EndSeq uint32
+	TSVal  uint32
 }
