@@ -183,7 +183,7 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 				f.ECNInitiated = tcp.ECE && tcp.CWR
 			}
 			to.ExpSeq = tcp.Seq + 1
-			to.PriorTSVal = tsval
+			to.HiTSVal = tsval
 		}
 
 		// handle acks
@@ -234,16 +234,17 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 
 		// detect retransmitted and late (out-of-order) segments
 		if !tcp.SYN {
-			if tcp.Seq-to.ExpSeq < math.MaxUint32/2 {
-				to.ExpSeq = tcp.Seq + segLen
-			} else {
+			if tcp.Seq-to.ExpSeq > math.MaxUint32/2 {
 				to.RetransmittedSegments++
+			} else {
+				to.ExpSeq = tcp.Seq + segLen
 			}
 
-			if tsval-to.PriorTSVal > math.MaxUint32/2 {
+			if tsval-to.HiTSVal > math.MaxUint32/2 {
 				to.LateSegments++
+			} else {
+				to.HiTSVal = tsval
 			}
-			to.PriorTSVal = tsval
 		}
 
 		// record inter-packet gap stats

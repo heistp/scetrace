@@ -69,7 +69,7 @@ type TCPOneWayData struct {
 	AckSeen               bool   `json:"-"`
 	PriorAck              uint32 `json:"-"`
 	ExpSeq                uint32 `json:"-"`
-	PriorTSVal            uint32 `json:"-"`
+	HiTSVal               uint32 `json:"-"`
 }
 
 func NewTCPOneWayData() *TCPOneWayData {

@@ -300,6 +300,7 @@ listening on en1, link-type Ethernet, capture size 10485760, snaplen 118, tstamp
 
 ## Todo
 
+- Fix TCP throughput calculation for retransmits and add goodput
 - Formatted text output
 - Per-packet and windowed output for plotting
 - Protocol support: QUIC, ICMP, IRTT
