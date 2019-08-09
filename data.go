@@ -41,6 +41,8 @@ type MetaData struct {
 }
 
 type TCPOneWayData struct {
+	Initialized           bool `json:"-"`
+	FinSeen               bool `json:"-"`
 	CE                    uint64
 	SCE                   uint64
 	ESCE                  uint64
@@ -51,9 +53,10 @@ type TCPOneWayData struct {
 	Acks                  uint64
 	AckedBytes            uint64
 	ESCEAckedBytes        uint64
+	Gaps                  uint64
+	GapBytes              uint64
 	LateSegments          uint64
 	RetransmittedSegments uint64
-	Overlappers           uint64 `json:",omitempty"`
 	FirstAckTime          time.Time
 	LastAckTime           time.Time
 	PriorPacketTime       time.Time `json:"-"`

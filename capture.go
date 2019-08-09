@@ -15,7 +15,7 @@ type ECN uint8
 const (
 	NotECT ECN = 0x00
 	SCE    ECN = 0x01
-	ECT    ECN = 0x02
+	ECT0   ECN = 0x02
 	CE     ECN = 0x03
 )
 
@@ -176,14 +176,18 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		}
 
 		// handle connection initiation
-		if tcp.SYN {
-			if tcp.ACK {
-				f.ECNAccepted = tcp.ECE
-			} else {
-				f.ECNInitiated = tcp.ECE && tcp.CWR
+		if !to.Initialized {
+			to.ExpSeq = tcp.Seq
+			if tcp.SYN {
+				if tcp.ACK {
+					f.ECNAccepted = tcp.ECE
+				} else {
+					f.ECNInitiated = tcp.ECE && tcp.CWR
+				}
+				to.ExpSeq++
 			}
-			to.ExpSeq = tcp.Seq + 1
 			to.HiTSVal = tsval
+			to.Initialized = true
 		}
 
 		// handle acks
@@ -210,6 +214,12 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			to.Acks++
 		}
 
+		// record inter-packet gap stats
+		if !to.PriorPacketTime.IsZero() {
+			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
+		}
+		to.PriorPacketTime = tstamp
+
 		// get dscp and segment length according to IP version
 		var dscp uint8
 		var segLen uint32
@@ -230,17 +240,16 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			dscp = ip6.TrafficClass
 		}
 
-		// record inter-packet gap stats
-		if !to.PriorPacketTime.IsZero() {
-			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
-		}
-		to.PriorPacketTime = tstamp
-
-		if !tcp.SYN && !tcp.FIN && !tcp.RST {
+		if !tcp.SYN && !tcp.FIN && !tcp.RST && !to.FinSeen {
 			// detect retransmitted and late (out-of-order) segments
-			if tcp.Seq-to.ExpSeq > math.MaxUint32/2 {
+			seqDelta := tcp.Seq - to.ExpSeq
+			if seqDelta > math.MaxUint32/2 {
 				to.RetransmittedSegments++
 			} else {
+				if seqDelta > 0 {
+					to.Gaps++
+					to.GapBytes += uint64(seqDelta)
+				}
 				to.ExpSeq = tcp.Seq + segLen
 			}
 
@@ -280,6 +289,11 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 
 		// increment segment count
 		to.Segments++
+
+		// set if FIN seen
+		if tcp.FIN {
+			to.FinSeen = true
+		}
 
 		// unlock data
 		d.Unlock()
