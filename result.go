@@ -94,6 +94,7 @@ type TCPOneWayResult struct {
 	RetransmittedPercent  float64
 	LostBytesPercent      float64
 	ElapsedAckTimeSeconds float64
+	MeanGapSizeBytes      float64
 	MeanSegmentSizeBytes  float64
 	GoodputMbit           float64
 }
@@ -122,6 +123,9 @@ func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult
 	}
 	if dr.AckedBytes > 0 {
 		r.LostBytesPercent = 100 * float64(r.GapBytes) / float64(dr.AckedBytes)
+	}
+	if r.Gaps > 0 {
+		r.MeanGapSizeBytes = float64(r.GapBytes) / float64(r.Gaps)
 	}
 	if r.DataSegments > 0 {
 		r.MeanSegmentSizeBytes = float64(dr.AckedBytes) / float64(r.DataSegments)
