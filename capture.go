@@ -94,8 +94,8 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		}
 		d.IP.Bytes += uint64(ipLen)
 
-		// go to next packet if not TCP
-		if !isTCP {
+		// go to next packet if not TCP or it's a TCP reset
+		if !isTCP || tcp.RST {
 			d.Unlock()
 			continue
 		}
@@ -190,9 +190,24 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			to.Initialized = true
 		}
 
+		// get dscp and segment length according to IP version
+		var dscp uint8
+		var segLen uint32
+		if isIP4 {
+			segLen = uint32(ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset))
+			dscp = ip4.TOS
+		} else {
+			segLen = uint32(ipLen - 40)
+			dscp = ip6.TrafficClass
+		}
+		if segLen > 0 {
+			to.SeqTimes[tcp.Seq] = tstamp
+			to.DataSegments++
+		}
+
 		// handle acks
-		var ackedBytes uint32
 		if tcp.ACK {
+			var ackedBytes uint32
 			if to.Acks > 0 {
 				ackedBytes = tcp.Ack - to.HiAck
 				if ackedBytes < math.MaxUint32/2 {
@@ -211,6 +226,54 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 				to.LastAckTime = tstamp
 				to.HiAck = tcp.Ack
 			}
+
+			if !tcp.SYN && !tcp.FIN && !to.FinSeen {
+				// detect retransmitted and late (out-of-order) segments
+				seqDelta := tcp.Seq - to.ExpSeq
+				if seqDelta > math.MaxUint32/2 {
+					to.RetransmittedSegments++
+				} else {
+					if seqDelta > 0 {
+						to.Gaps++
+						to.GapBytes += uint64(seqDelta)
+					}
+					to.ExpSeq = tcp.Seq + segLen
+				}
+
+				if tsval-to.HiTSVal > math.MaxUint32/2 {
+					to.LateSegments++
+				} else {
+					to.HiTSVal = tsval
+				}
+
+				// record congestion related stats
+				if tcp.CWR {
+					to.CWR++
+				}
+				if tcp.ECE {
+					to.ECE++
+				}
+				if tcp.NS {
+					to.ESCE++
+					to.ESCEAckedBytes += uint64(ackedBytes)
+				}
+				ecn := ECN(dscp & 0x03)
+				if ecn == CE {
+					to.CE++
+				}
+				if ecn == SCE {
+					to.SCE++
+					if !to.PriorSCETime.IsZero() {
+						to.SCEIPG.Push(tstamp.Sub(to.PriorSCETime))
+					}
+					to.PriorSCETime = tstamp
+					to.SCERunCount++
+				} else if to.SCERunCount > 0 {
+					to.SCERunLength.Push(float64(to.SCERunCount))
+					to.SCERunCount = 0
+				}
+			}
+
 			to.Acks++
 		}
 
@@ -219,73 +282,6 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
 		}
 		to.PriorPacketTime = tstamp
-
-		// get dscp and segment length according to IP version
-		var dscp uint8
-		var segLen uint32
-		if isIP4 {
-			segLen = uint32(ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset))
-			if segLen > 0 {
-				to.SeqTimes[tcp.Seq] = tstamp
-				to.DataSegments++
-			}
-			dscp = ip4.TOS
-		} else {
-			// TODO calculate proper segment length
-			segLen = uint32(ipLen - 40)
-			if segLen > 0 {
-				to.SeqTimes[tcp.Seq] = tstamp
-				to.DataSegments++
-			}
-			dscp = ip6.TrafficClass
-		}
-
-		if !tcp.SYN && !tcp.FIN && !tcp.RST && !to.FinSeen {
-			// detect retransmitted and late (out-of-order) segments
-			seqDelta := tcp.Seq - to.ExpSeq
-			if seqDelta > math.MaxUint32/2 {
-				to.RetransmittedSegments++
-			} else {
-				if seqDelta > 0 {
-					to.Gaps++
-					to.GapBytes += uint64(seqDelta)
-				}
-				to.ExpSeq = tcp.Seq + segLen
-			}
-
-			if tsval-to.HiTSVal > math.MaxUint32/2 {
-				to.LateSegments++
-			} else {
-				to.HiTSVal = tsval
-			}
-
-			// record congestion related stats
-			if tcp.CWR {
-				to.CWR++
-			}
-			if tcp.ECE {
-				to.ECE++
-			}
-			if tcp.NS {
-				to.ESCE++
-				to.ESCEAckedBytes += uint64(ackedBytes)
-			}
-			ecn := ECN(dscp & 0x03)
-			if ecn == CE {
-				to.CE++
-			}
-			if ecn == SCE {
-				to.SCE++
-				if !to.PriorSCETime.IsZero() {
-					to.SCEIPG.Push(tstamp.Sub(to.PriorSCETime))
-				}
-				to.PriorSCETime = tstamp
-				to.SCERunCount++
-			} else if to.SCERunCount > 0 {
-				to.SCERunLength.Push(float64(to.SCERunCount))
-				to.SCERunCount = 0
-			}
-		}
 
 		// increment segment count
 		to.Segments++
