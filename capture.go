@@ -230,8 +230,14 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			dscp = ip6.TrafficClass
 		}
 
-		// detect retransmitted and late (out-of-order) segments
-		if !tcp.SYN {
+		// record inter-packet gap stats
+		if !to.PriorPacketTime.IsZero() {
+			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
+		}
+		to.PriorPacketTime = tstamp
+
+		if !tcp.SYN && !tcp.FIN && !tcp.RST {
+			// detect retransmitted and late (out-of-order) segments
 			if tcp.Seq-to.ExpSeq > math.MaxUint32/2 {
 				to.RetransmittedSegments++
 			} else {
@@ -243,16 +249,8 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 			} else {
 				to.HiTSVal = tsval
 			}
-		}
 
-		// record inter-packet gap stats
-		if !to.PriorPacketTime.IsZero() {
-			to.IPG.Push(tstamp.Sub(to.PriorPacketTime))
-		}
-		to.PriorPacketTime = tstamp
-
-		// record congestion related stats
-		if !tcp.SYN && !tcp.FIN && !tcp.RST {
+			// record congestion related stats
 			if tcp.CWR {
 				to.CWR++
 			}
@@ -263,7 +261,6 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 				to.ESCE++
 				to.ESCEAckedBytes += uint64(ackedBytes)
 			}
-
 			ecn := ECN(dscp & 0x03)
 			if ecn == CE {
 				to.CE++

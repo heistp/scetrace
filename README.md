@@ -8,10 +8,11 @@ Feel free to report any problems or feature requests as issues.
 
 - reads from pcap file or live capture, with filter expression support
 - records or calculates:
+  - status of ECN negotiation (initiated/accepted)
   - per-flow counts for: CE, SCE, ESCE, ECE, CWR, segments, acked bytes
   - SCE percent and ESCE acked bytes percent for feedback verification
-  - TCP throughput from pcap timestamps and acked bytes
-  - Retransmitted and late (out-of-order) segments
+  - TCP goodput from pcap timestamps and acked bytes
+  - Retransmitted and late (out-of-order per TSVal) segments
   - TCP RTT using both TSVal and TCP seqno methods
   - IPG for all packets and separately only SCE marked packets
   - min, max, mean, stddev, variance and burstiness (index of dispersion) for
@@ -35,20 +36,17 @@ Note that some NIC offloads may need to be disabled to obtain the expected resul
 ## Sample Run
 
 ```
-% sudo ./scetrace -i en1 tcp port 5201
-Password:
-listening on en1, link-type Ethernet, capture size 10485760, snaplen 118, tstamp source default, tstamp resolution 1ns
-^Cinterrupt
+reading from file "enp2s0_100mbit_adv.pcap", link-type Ethernet, snaplen 128, tstamp resolution 1µs
 {
     "IP": {
-        "Packets": 112205,
-        "Bytes": 120988630
+        "Packets": 60690,
+        "Bytes": 62950183
     },
     "TCP": [
         {
-            "SrcIP": "10.72.0.51",
-            "SrcPort": 50080,
-            "DstIP": "10.72.0.251",
+            "SrcIP": "10.9.1.2",
+            "SrcPort": 57698,
+            "DstIP": "10.9.2.2",
             "DstPort": 5201,
             "ECNInitiated": true,
             "ECNAccepted": true,
@@ -58,53 +56,53 @@ listening on en1, link-type Ethernet, capture size 10485760, snaplen 118, tstamp
                 "ESCE": 0,
                 "ECE": 0,
                 "CWR": 0,
-                "Segments": 9,
-                "DataSegments": 3,
-                "Acks": 8,
-                "AckedBytes": 4,
+                "Segments": 18,
+                "DataSegments": 7,
+                "Acks": 17,
+                "AckedBytes": 312,
                 "ESCEAckedBytes": 0,
                 "LateSegments": 0,
                 "RetransmittedSegments": 0,
-                "FirstAckTime": "2019-08-08T11:25:01.744564+02:00",
-                "LastAckTime": "2019-08-08T11:25:01.809601+02:00",
+                "FirstAckTime": "2019-07-06T22:43:29.018879+02:00",
+                "LastAckTime": "2019-07-06T22:43:34.029414+02:00",
                 "SCERunLength": {},
                 "IPG": {
-                    "N": 8,
-                    "Min": 0.093,
-                    "Max": 44.166,
-                    "Mean": 8.242875,
-                    "Stddev": 15.288885191887417,
-                    "Variance": 233.75001041071428,
-                    "Burstiness": 28.357825444485606
+                    "N": 17,
+                    "Min": 0.009,
+                    "Max": 4999.786,
+                    "Mean": 294.7816470588236,
+                    "Stddev": 1212.4523070710834,
+                    "Variance": 1470040.5969219927,
+                    "Burstiness": 4986.879650036851
                 },
                 "SCEIPG": {},
                 "SeqRTT": {
-                    "N": 3,
-                    "Min": 1.05,
-                    "Max": 44.078,
-                    "Mean": 15.458,
-                    "Stddev": 24.78584079671295,
-                    "Variance": 614.337904,
-                    "Burstiness": 39.7423925475482
+                    "N": 7,
+                    "Min": 0.07,
+                    "Max": 0.131,
+                    "Mean": 0.09942857142857142,
+                    "Stddev": 0.01955212812677214,
+                    "Variance": 0.00038228571428571424,
+                    "Burstiness": 0.0038448275862068963
                 },
                 "TSValRTT": {
-                    "N": 6,
-                    "Min": 0.833,
-                    "Max": 44.078,
-                    "Mean": 10.643666666666666,
-                    "Stddev": 17.236531700625463,
-                    "Variance": 297.0980250666666,
-                    "Burstiness": 27.913127531239233
+                    "N": 11,
+                    "Min": 0.061,
+                    "Max": 4.09,
+                    "Mean": 0.4712727272727273,
+                    "Stddev": 1.2006664058687653,
+                    "Variance": 1.4415998181818184,
+                    "Burstiness": 3.058950231481482
                 },
                 "SCEPercent": 0,
                 "ESCEPercent": 0,
                 "ESCEAckedBytesPercent": 0,
-                "AckPercent": 200,
+                "AckPercent": 242.85714285714286,
                 "LatePercent": 0,
                 "RetransmittedPercent": 0,
-                "ElapsedAckTimeSeconds": 0.065037,
-                "MeanSegmentSizeBytes": 47,
-                "ThroughputMbit": 0.023369520179000583
+                "ElapsedAckTimeSeconds": 5.010535,
+                "MeanSegmentSizeBytes": 66.28571428571429,
+                "GoodputMbit": 0.0007408148044813707
             },
             "Down": {
                 "CE": 0,
@@ -112,195 +110,202 @@ listening on en1, link-type Ethernet, capture size 10485760, snaplen 118, tstamp
                 "ESCE": 0,
                 "ECE": 0,
                 "CWR": 0,
-                "Segments": 8,
-                "DataSegments": 4,
-                "Acks": 8,
-                "AckedBytes": 141,
+                "Segments": 16,
+                "DataSegments": 7,
+                "Acks": 16,
+                "AckedBytes": 464,
                 "ESCEAckedBytes": 0,
                 "LateSegments": 0,
                 "RetransmittedSegments": 0,
-                "FirstAckTime": "2019-08-08T11:25:01.744491+02:00",
-                "LastAckTime": "2019-08-08T11:25:01.792759+02:00",
+                "FirstAckTime": "2019-07-06T22:43:29.018319+02:00",
+                "LastAckTime": "2019-07-06T22:43:34.029018+02:00",
                 "SCERunLength": {},
                 "IPG": {
-                    "N": 7,
-                    "Min": 0.033,
-                    "Max": 44.332,
-                    "Mean": 9.295857142857143,
-                    "Stddev": 16.26425986048931,
-                    "Variance": 264.5261488095238,
-                    "Burstiness": 28.456348322089198
+                    "N": 15,
+                    "Min": 0.042,
+                    "Max": 5000.371,
+                    "Mean": 334.04659999999996,
+                    "Stddev": 1290.9002143176124,
+                    "Variance": 1666423.3633252576,
+                    "Burstiness": 4988.595493339127
                 },
                 "SCEIPG": {},
                 "SeqRTT": {
-                    "N": 4,
-                    "Min": 0.033,
-                    "Max": 0.082,
-                    "Mean": 0.059,
-                    "Stddev": 0.026670833007863354,
-                    "Variance": 0.0007113333333333335,
-                    "Burstiness": 0.012056497175141245
+                    "N": 7,
+                    "Min": 0.34,
+                    "Max": 0.547,
+                    "Mean": 0.43971428571428567,
+                    "Stddev": 0.06723023696153957,
+                    "Variance": 0.0045199047619047614,
+                    "Burstiness": 0.010279185618366904
                 },
                 "TSValRTT": {
-                    "N": 6,
-                    "Min": 0.033,
-                    "Max": 0.088,
-                    "Mean": 0.06616666666666667,
-                    "Stddev": 0.02392836531538807,
-                    "Variance": 0.0005725666666666667,
-                    "Burstiness": 0.008653400503778337
+                    "N": 11,
+                    "Min": 0.333,
+                    "Max": 0.653,
+                    "Mean": 0.4563636363636364,
+                    "Stddev": 0.0986552307049887,
+                    "Variance": 0.009732854545454545,
+                    "Burstiness": 0.021326972111553783
                 },
                 "SCEPercent": 0,
                 "ESCEPercent": 0,
                 "ESCEAckedBytesPercent": 0,
-                "AckPercent": 266.6666666666667,
+                "AckPercent": 228.57142857142858,
                 "LatePercent": 0,
                 "RetransmittedPercent": 0,
-                "ElapsedAckTimeSeconds": 0.048268,
-                "MeanSegmentSizeBytes": 1,
-                "ThroughputMbit": 0.0004920276150498947
+                "ElapsedAckTimeSeconds": 5.010699,
+                "MeanSegmentSizeBytes": 44.57142857142857,
+                "GoodputMbit": 0.0004981503971132823
             },
-            "MeanSeqRTTMillis": 15.517,
-            "MeanTSValRTTMillis": 10.709832
+            "MeanSeqRTTMillis": 0.539142,
+            "MeanTSValRTTMillis": 0.927635
         },
         {
-            "SrcIP": "10.72.0.51",
-            "SrcPort": 50081,
-            "DstIP": "10.72.0.251",
+            "SrcIP": "10.9.1.2",
+            "SrcPort": 57700,
+            "DstIP": "10.9.2.2",
             "DstPort": 5201,
             "ECNInitiated": true,
             "ECNAccepted": true,
             "Up": {
-                "CE": 0,
-                "SCE": 0,
+                "CE": 1,
+                "SCE": 4130,
                 "ESCE": 0,
                 "ECE": 0,
-                "CWR": 7,
-                "Segments": 79488,
-                "DataSegments": 79486,
-                "Acks": 79487,
+                "CWR": 1,
+                "Segments": 41297,
+                "DataSegments": 41295,
+                "Acks": 41296,
                 "AckedBytes": 0,
                 "ESCEAckedBytes": 0,
                 "LateSegments": 0,
-                "RetransmittedSegments": 370,
-                "FirstAckTime": "2019-08-08T11:25:01.795522+02:00",
-                "LastAckTime": "2019-08-08T11:25:01.795522+02:00",
-                "SCERunLength": {},
-                "IPG": {
-                    "N": 79487,
-                    "Min": 0,
-                    "Max": 19.434,
-                    "Mean": 0.12403098619900034,
-                    "Stddev": 0.6457944818618904,
-                    "Variance": 0.4170505128032675,
-                    "Burstiness": 3.362470343774698
+                "RetransmittedSegments": 0,
+                "FirstAckTime": "2019-07-06T22:43:29.02162+02:00",
+                "LastAckTime": "2019-07-06T22:43:34.029268+02:00",
+                "SCERunLength": {
+                    "N": 3309,
+                    "Min": 1,
+                    "Max": 56,
+                    "Mean": 1.2481112118464794,
+                    "Stddev": 1.1036518330175467,
+                    "Variance": 1.2180473685229907,
+                    "Burstiness": 0.975912528436459
                 },
-                "SCEIPG": {},
+                "IPG": {
+                    "N": 41296,
+                    "Min": 0.005,
+                    "Max": 4.464,
+                    "Mean": 0.12127801724137956,
+                    "Stddev": 0.027453739043736526,
+                    "Variance": 0.0007537077874815834,
+                    "Burstiness": 0.006214710667486255
+                },
+                "SCEIPG": {
+                    "N": 4129,
+                    "Min": 0.052,
+                    "Max": 33.037,
+                    "Mean": 1.2093773310729001,
+                    "Stddev": 1.5850448039572533,
+                    "Variance": 2.512367030551887,
+                    "Burstiness": 2.077405426743892
+                },
                 "SeqRTT": {
-                    "N": 30192,
-                    "Min": 1.447,
-                    "Max": 104.867,
-                    "Mean": 42.229981153947904,
-                    "Stddev": 7.315474682535682,
-                    "Variance": 53.51616983082054,
-                    "Burstiness": 1.2672553567033153
+                    "N": 19337,
+                    "Min": 0.099,
+                    "Max": 0.582,
+                    "Mean": 0.3590830014997154,
+                    "Stddev": 0.0783738302656609,
+                    "Variance": 0.006142457270510625,
+                    "Burstiness": 0.017105953901623196
                 },
                 "TSValRTT": {
-                    "N": 3273,
-                    "Min": 1.369,
-                    "Max": 90.668,
-                    "Mean": 40.09116590284135,
-                    "Stddev": 5.460364118380026,
-                    "Variance": 29.815576305292076,
-                    "Burstiness": 0.7436944183052303
+                    "N": 15049,
+                    "Min": -0.016,
+                    "Max": 0.477,
+                    "Mean": 0.08094551132965618,
+                    "Stddev": 0.07540515998611264,
+                    "Variance": 0.005685938152531241,
+                    "Burstiness": 0.07024402044203372
                 },
-                "SCEPercent": 0,
+                "SCEPercent": 10.001210800339024,
                 "ESCEPercent": 0,
                 "ESCEAckedBytesPercent": 0,
                 "AckPercent": 0,
                 "LatePercent": 0,
-                "RetransmittedPercent": 0.4654790660225443,
-                "ElapsedAckTimeSeconds": 0,
-                "MeanSegmentSizeBytes": 1435.5176634879099,
-                "ThroughputMbit": 92.56762874642311
+                "RetransmittedPercent": 0,
+                "ElapsedAckTimeSeconds": 5.007648,
+                "MeanSegmentSizeBytes": 1446.9489526577067,
+                "GoodputMbit": 95.50913583956856
             },
             "Down": {
                 "CE": 0,
                 "SCE": 0,
-                "ESCE": 0,
-                "ECE": 0,
+                "ESCE": 3825,
+                "ECE": 40,
                 "CWR": 0,
-                "Segments": 32700,
+                "Segments": 19359,
                 "DataSegments": 0,
-                "Acks": 32700,
-                "AckedBytes": 114103557,
-                "ESCEAckedBytes": 0,
+                "Acks": 19338,
+                "AckedBytes": 59751757,
+                "ESCEAckedBytes": 9167288,
                 "LateSegments": 0,
                 "RetransmittedSegments": 0,
-                "FirstAckTime": "2019-08-08T11:25:01.795477+02:00",
-                "LastAckTime": "2019-08-08T11:25:11.656683+02:00",
+                "FirstAckTime": "2019-07-06T22:43:29.021079+02:00",
+                "LastAckTime": "2019-07-06T22:43:34.025983+02:00",
                 "SCERunLength": {},
                 "IPG": {
-                    "N": 32699,
-                    "Min": 0,
-                    "Max": 19.55,
-                    "Mean": 0.3015751552035239,
-                    "Stddev": 1.0098509130858013,
-                    "Variance": 1.0197988666602267,
-                    "Burstiness": 3.381574539759402
+                    "N": 19358,
+                    "Min": 0.011,
+                    "Max": 4.46,
+                    "Mean": 0.25872729620828694,
+                    "Stddev": 0.12676865199903548,
+                    "Variance": 0.016070291129652563,
+                    "Burstiness": 0.062112855369984864
                 },
                 "SCEIPG": {},
                 "SeqRTT": {},
                 "TSValRTT": {
-                    "N": 11968,
-                    "Min": 0.009,
-                    "Max": 12.035,
-                    "Mean": 0.19046014371657824,
-                    "Stddev": 0.16814757357825685,
-                    "Variance": 0.02827360650025531,
-                    "Burstiness": 0.14844894027975203
+                    "N": 4415,
+                    "Min": 0.085,
+                    "Max": 6.51,
+                    "Mean": 2.5581667044167573,
+                    "Stddev": 0.41867461255425,
+                    "Variance": 0.17528843119745138,
+                    "Burstiness": 0.06852111353603743
                 },
                 "SCEPercent": 0,
                 "ESCEPercent": 0,
-                "ESCEAckedBytesPercent": 0,
-                "AckPercent": 41.139320131847114,
+                "ESCEAckedBytesPercent": 15.342290269389066,
+                "AckPercent": 46.82891391209589,
                 "LatePercent": 0,
                 "RetransmittedPercent": 0,
-                "ElapsedAckTimeSeconds": 9.861206,
+                "ElapsedAckTimeSeconds": 5.004904,
                 "MeanSegmentSizeBytes": 0,
-                "ThroughputMbit": 0
+                "GoodputMbit": 0
             },
-            "MeanSeqRTTMillis": 42.229981,
-            "MeanTSValRTTMillis": 40.281625
+            "MeanSeqRTTMillis": 0.359083,
+            "MeanTSValRTTMillis": 2.6391109999999998
         }
     ],
     "Meta": {
-        "ParseStartTime": "2019-08-08T11:24:49.988834+02:00",
-        "ParseEndTime": "2019-08-08T11:25:13.365785+02:00",
-        "CaptureStartTime": "2019-08-08T11:25:01.743658+02:00",
-        "CaptureEndTime": "2019-08-08T11:25:11.656683+02:00",
-        "PCAPStats": {
-            "PacketsReceived": 136631,
-            "PacketsDropped": 0,
-            "PacketsIfDropped": 0
-        },
-        "ParseElapsed": 23377329822,
-        "ParsePacketsPerSecond": 4799.735506764584,
-        "ParseMbit": 41.40374659423753,
-        "CaptureElapsed": 9913025000,
-        "CapturePacketsPerSecond": 11318.946537509994,
-        "CaptureMbit": 97.64012902217033
+        "ParseStartTime": "2019-08-09T12:15:39.588242+02:00",
+        "ParseEndTime": "2019-08-09T12:15:39.6488+02:00",
+        "CaptureStartTime": "2019-07-06T22:43:29.018126+02:00",
+        "CaptureEndTime": "2019-07-06T22:43:34.029522+02:00",
+        "ParseElapsed": 60558746,
+        "ParsePacketsPerSecond": 1002167.3830564457,
+        "ParseMbit": 8315.916317025456,
+        "CaptureElapsed": 5011396000,
+        "CapturePacketsPerSecond": 12110.397980921882,
+        "CaptureMbit": 100.49125313585276
     }
 }
-112205 packets with 2 TCP flows captured at 11319 pps
-136631 packets received by filter
-0 packets dropped by kernel
-0 packets dropped by interface
+60690 packets with 2 TCP flows parsed at 1002167 pps (8315.92Mbit)
 ```
 
 ## Todo
 
-- Fix TCP throughput calculation for retransmits and add goodput
 - Formatted text output
 - Per-packet and windowed output for plotting
 - Protocol support: QUIC, ICMP, IRTT
