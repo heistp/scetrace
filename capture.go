@@ -237,6 +237,9 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 						tor.SeqRTT.Push(tstamp.Sub(pt))
 						delete(tor.SeqTimes, to.PriorAck)
 					}
+					// Note: if SACK is not supported, implementations count one
+					// segment of ESCE acked bytes, for what that's worth. Also
+					// in rare cases might encounter window probes.
 					to.PriorAck = tcp.Ack
 				}
 			} else {
