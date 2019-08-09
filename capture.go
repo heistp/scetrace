@@ -86,11 +86,11 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 
 		// update IP stats
 		d.IP.Packets++
-		var ipLen int
+		var ipLen uint
 		if isIP4 {
-			ipLen = int(ip4.Length)
+			ipLen = uint(ip4.Length)
 		} else {
-			ipLen = int(ip6.Length) + 40
+			ipLen = uint(ip6.Length) + 40
 		}
 		d.IP.Bytes += uint64(ipLen)
 
@@ -194,10 +194,10 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		var dscp uint8
 		var segLen uint32
 		if isIP4 {
-			segLen = uint32(ipLen - 4*int(ip4.IHL) - 4*int(tcp.DataOffset))
+			segLen = uint32(ipLen) - 4*uint32(ip4.IHL) - 4*uint32(tcp.DataOffset)
 			dscp = ip4.TOS
 		} else {
-			segLen = uint32(ipLen - 40)
+			segLen = uint32(ipLen) - 40
 			dscp = ip6.TrafficClass
 		}
 		if segLen > 0 {
@@ -209,22 +209,40 @@ func Capture(pch <-chan gopacket.Packet, d *Data) {
 		if tcp.ACK {
 			var ackedBytes uint32
 			if to.Acks > 0 {
-				ackedBytes = tcp.Ack - to.HiAck
-				if ackedBytes < math.MaxUint32/2 {
+				ackedBytes = tcp.Ack - to.PriorAck
+				if ackedBytes == 0 { // duplicate ack
+					for _, opt := range tcp.Options {
+						if opt.OptionType == layers.TCPOptionKindSACK {
+							n := int(opt.OptionLength) - 2
+							for l, r := 0, 4; l < n; l, r = l+8, r+8 {
+								le := binary.BigEndian.Uint32(opt.OptionData[l : l+4])
+								re := binary.BigEndian.Uint32(opt.OptionData[r : r+4])
+								ackedBytes += (re - le)
+								//log.Printf("SACK %d %d", ackedBytes, to.SackedBytesCtr)
+							}
+							to.SackedBytesCtr += ackedBytes
+							to.SackedBytes += uint64(ackedBytes)
+							break
+						}
+					}
+					to.DuplicateAcks++
+				} else { // standard ack
+					if to.SackedBytesCtr > 0 {
+						ackedBytes -= to.SackedBytesCtr
+						to.SackedBytesCtr = 0
+					}
 					to.AckedBytes += uint64(ackedBytes)
 					to.LastAckTime = tstamp
-					if pt, ok := tor.SeqTimes[to.HiAck]; ok {
+					if pt, ok := tor.SeqTimes[to.PriorAck]; ok {
 						tor.SeqRTT.Push(tstamp.Sub(pt))
-						delete(tor.SeqTimes, to.HiAck)
+						delete(tor.SeqTimes, to.PriorAck)
 					}
-					to.HiAck = tcp.Ack
-				} else {
-					ackedBytes = 0
+					to.PriorAck = tcp.Ack
 				}
 			} else {
 				to.FirstAckTime = tstamp
 				to.LastAckTime = tstamp
-				to.HiAck = tcp.Ack
+				to.PriorAck = tcp.Ack
 			}
 
 			if !tcp.SYN && !tcp.FIN && !to.FinSeen {

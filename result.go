@@ -89,7 +89,7 @@ type TCPOneWayResult struct {
 	SCEPercent            float64
 	ESCEPercent           float64
 	ESCEAckedBytesPercent float64
-	AckPercent            float64
+	AckedSegmentsPercent  float64
 	LatePercent           float64
 	RetransmittedPercent  float64
 	LostBytesPercent      float64
@@ -113,7 +113,7 @@ func NewTCPOneWayResult(d *TCPOneWayData, dr *TCPOneWayData) (r *TCPOneWayResult
 		r.ESCEAckedBytesPercent = 100 * float64(r.ESCEAckedBytes) / float64(r.AckedBytes)
 	}
 	if dr.DataSegments > 0 {
-		r.AckPercent = 100 * float64(r.Acks) / float64(dr.DataSegments)
+		r.AckedSegmentsPercent = 100 * float64(r.Acks) / float64(dr.DataSegments)
 	}
 	if r.Segments > 0 {
 		r.LatePercent = 100 * float64(r.LateSegments) / float64(r.Segments)

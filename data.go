@@ -52,7 +52,9 @@ type TCPOneWayData struct {
 	DataSegments          uint64
 	Acks                  uint64
 	AckedBytes            uint64
+	SackedBytes           uint64
 	ESCEAckedBytes        uint64
+	DuplicateAcks         uint64
 	Gaps                  uint64
 	GapBytes              uint64
 	LateSegments          uint64
@@ -69,7 +71,8 @@ type TCPOneWayData struct {
 	SeqRTT                DurationData
 	TSValTimes            map[uint32]time.Time `json:"-"`
 	TSValRTT              DurationData
-	HiAck                 uint32 `json:"-"`
+	SackedBytesCtr        uint32 `json:"-"`
+	PriorAck              uint32 `json:"-"`
 	ExpSeq                uint32 `json:"-"`
 	HiTSVal               uint32 `json:"-"`
 }
